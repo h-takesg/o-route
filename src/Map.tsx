@@ -1,18 +1,17 @@
+import { LatLngBounds } from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { MapContainer, ImageOverlay } from 'react-leaflet'
 
 function Map() {
+  const bounds = new LatLngBounds([0,0],[1489/16,2560/8])
   return (
-      <MapContainer center={[51.505, -0.09]} zoom={13} scrollWheelZoom={false} style={{height: "100vh"}}>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    <MapContainer center={[0,0]} zoom={1} scrollWheelZoom style={{height: "100vh"}}>
+        <ImageOverlay
+          url='samplemap.jpg'
+          bounds={bounds}
+          opacity={1}
+          zIndex={1}
         />
-        <Marker position={[51.505, -0.09]}>
-          <Popup>
-            A pretty CSS3 popup. <br /> Easily customizable.
-          </Popup>
-        </Marker>
     </MapContainer>
   )
 }
