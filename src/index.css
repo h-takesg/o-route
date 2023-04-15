@@ -2,3 +2,8 @@
 body {
     margin: 0;
 }
+
+/* 要素のスクロールを許さない */
+body {
+    overflow: hidden;
+}
