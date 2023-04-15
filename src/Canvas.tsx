@@ -1,5 +1,5 @@
 import Konva from "konva"
-import { useRef } from "react"
+import { KeyboardEvent, KeyboardEventHandler, useCallback, useEffect, useRef, useState } from "react"
 import { Layer, Rect, Stage, Image } from "react-konva"
 import useImage from "use-image"
 
@@ -19,39 +19,61 @@ function Canvas({size}: Props) {
   console.log("render Konva Stage");
   const stageRef = useRef<Konva.Stage>(null)
   const scaleBy = 1.1;
+  const [rotation, setRotation] = useState(0)
+  const [ctrlKey, setCtrlKey] = useState(false)
+
+  const keydownHandler = useCallback((event: KeyboardEvent) => {
+    if (event.ctrlKey) {
+      setCtrlKey(true)
+    }
+  }, [])
+
+  const keyupHandler = useCallback((event: KeyboardEvent) => {
+    if (!event.ctrlKey) {
+      setCtrlKey(false)
+    }
+  }, [])
 
   const wheelHandler = (event: Konva.KonvaEventObject<WheelEvent>) => {
-    console.log(event)
     event.evt.preventDefault()
     if (stageRef.current !== null) {
-      const stage = stageRef.current
-      const oldScale = stage.scaleX()
-      const { x: pointerX, y: pointerY } = stage.getPointerPosition();
-      const mousePointTo = {
-        x: (pointerX - stage.x()) / oldScale,
-        y: (pointerY - stage.y()) / oldScale,
-      }
-      const newScale = event.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy;
-      stage.scale({ x: newScale, y: newScale});
-      const newPos = {
-        x: pointerX - mousePointTo.x * newScale,
-        y: pointerY - mousePointTo.y * newScale,
-      }
-      stage.position(newPos);
-      stage.batchDraw();
+      if (event.evt.ctrlKey) {
+        setRotation(rotation + 1 % 360)
+      } else {
+        const stage = stageRef.current
+        const oldScale = stage.scaleX()
+        const { x: pointerX, y: pointerY } = stage.getPointerPosition();
+        const mousePointTo = {
+          x: (pointerX - stage.x()) / oldScale,
+          y: (pointerY - stage.y()) / oldScale,
+        }
+        const newScale = event.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy;
+        stage.scale({ x: newScale, y: newScale});
+        const newPos = {
+          x: pointerX - mousePointTo.x * newScale,
+          y: pointerY - mousePointTo.y * newScale,
+        }
+        stage.position(newPos);
+        stage.batchDraw();
+      } 
     }
   }
+
+  useEffect(() => {
+    document.addEventListener("keydown", keydownHandler, false)
+    document.addEventListener("keyup", keyupHandler, false)
+  }, [])
 
   return (
     <Stage
       height={size.height}
       width={size.width}
       ref={stageRef}
+      rotation={rotation}
       onWheel={wheelHandler}
-      draggable
+      draggable={!ctrlKey}
     >
       <Layer>
-        <Rect fill='red' x={100} y={100} width={300} height={200} />
         <MapImage />
       </Layer>
     </Stage>
