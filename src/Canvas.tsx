@@ -1,6 +1,6 @@
 import Konva from "konva"
 import { KeyboardEvent, useEffect, useRef, useState } from "react"
-import { Layer, Stage, Image, Circle, Group } from "react-konva"
+import { Layer, Stage, Image, Circle, Group, Line } from "react-konva"
 import useImage from "use-image"
 
 type Props = {
@@ -21,6 +21,9 @@ function Canvas({size}: Props) {
   const scaleBy = 1.1;
   const rotateBy = 0.02;
   const [ctrlKey, setCtrlKey] = useState(false)
+  const [drawMode, setDrawMode] = useState(false)
+  const [drawingLine, setDrawingLine] = useState<number[]>([]);
+  const [lines, setLines] = useState<number[][]>([])
 
   // Canvasの座標で中心を指定しGroupをdegree回転させる
   const rotateAt = (x: number, y: number, degree: number) => {
@@ -42,11 +45,36 @@ function Canvas({size}: Props) {
   }
 
   const handleMousemove = (event: Konva.KonvaEventObject<MouseEvent>) => {
-    if(event.evt.ctrlKey && event.evt.buttons > 0) {
-      console.log(groupRef.current?.getPosition())
+    if (!drawMode) return;
+    if (event.evt.buttons === 0) return;
+
+    const stage = stageRef.current;
+    const group = groupRef.current;
+    if (stage === null || group === null) return;
+
+    const rotation = group.rotation();
+    const rotationRadian = rotation * Math.PI / 180;
+    const scale = group.scaleX();
+    const {x: pointerStageX, y: pointerStageY} = stage.getPointerPosition()!;
+    const mousePointTo = {
+      x: (pointerStageX - group.x()) / scale,
+      y: (pointerStageY - group.y()) / scale,
     }
+    const rotateCorrected = {
+      x: mousePointTo.x * Math.cos(-rotationRadian) - mousePointTo.y * Math.sin(-rotationRadian),
+      y: mousePointTo.x * Math.sin(-rotationRadian) + mousePointTo.y * Math.cos(-rotationRadian)
+    }
+
+    setDrawingLine([...drawingLine, rotateCorrected.x, rotateCorrected.y])
   }
 
+  const handleMouseUp = (event: Konva.KonvaEventObject<MouseEvent>) => {
+    if (event.evt.buttons !== 0) return;
+
+    setLines([...lines, drawingLine]);
+    setDrawingLine([]);
+  }
+  
   const handleKeydown = (event: KeyboardEvent) => {
     if (event.ctrlKey) {
       setCtrlKey(true)
@@ -86,6 +114,10 @@ function Canvas({size}: Props) {
     }
   }
 
+  const toggleMode = (event: Konva.KonvaEventObject<MouseEvent>) => {
+    setDrawMode(!drawMode)
+  }
+
   useEffect(() => {
     document.addEventListener("keydown", handleKeydown, false)
     document.addEventListener("keyup", handleKeyup, false)
@@ -99,15 +131,31 @@ function Canvas({size}: Props) {
       onMouseMove={handleMousemove}
       onWheel={handleWheel}
     >
-      <Layer
-      >
+      <Layer>
         <Group
-        ref={groupRef}
-        draggable={!ctrlKey}
+          ref={groupRef}
+          draggable={!ctrlKey && !drawMode}
+          onMouseMove={handleMousemove}
+          onMouseUp={handleMouseUp}
         >
           <MapImage />
+          {lines.map((line, i) => 
+            <Line
+              key={i}
+              points={line}
+              stroke={"red"}
+              lineCap="round"
+              strokeWidth={8}
+          />)}
+          <Line
+            key="drawing"
+            points={drawingLine}
+            stroke={"blue"}
+            lineCap="round"
+            strokeWidth={8}
+          />
         </Group>
-        <Circle fill="red" radius={10} x={size.width/2} y={size.height/2} />
+        <Circle fill={drawMode ? "blue" : "red"} radius={10} x={size.width/2} y={size.height/2} onClick={toggleMode} />
       </Layer>
     </Stage>
   )
