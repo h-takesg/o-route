@@ -2,20 +2,15 @@ import Konva from "konva"
 import { KeyboardEvent, useEffect, useRef, useState } from "react"
 import { Layer, Stage, Image, Circle, Group, Line } from "react-konva"
 import useImage from "use-image"
-
-type Props = {
-  size: {
-    height: number,
-    width: number
-  }
-}
+import { useWindowSize } from "./hooks/useWindwosSize"
 
 const MapImage = () => {
   const [image] = useImage('./samplemap.jpg')
   return <Image image={image} />
 }
 
-function Canvas({size}: Props) {
+function Canvas() {
+  const [width, height] = useWindowSize();
   const stageRef = useRef<Konva.Stage>(null)
   const groupRef = useRef<Konva.Group>(null)
   const scaleBy = 1.1;
@@ -94,7 +89,7 @@ function Canvas({size}: Props) {
 
     if (stage !== null && group !== null) {
       if (event.evt.ctrlKey) {
-        rotateAt(size.width / 2, size.height / 2, event.evt.deltaY * rotateBy);
+        rotateAt(width / 2, height / 2, event.evt.deltaY * rotateBy);
       } else {
         const oldScale = group.scaleX()
         const { x: pointerX, y: pointerY } = stage.getPointerPosition()!;
@@ -125,8 +120,8 @@ function Canvas({size}: Props) {
 
   return (
     <Stage
-      height={size.height}
-      width={size.width}
+      height={height}
+      width={width}
       ref={stageRef}
       onMouseMove={handleMousemove}
       onWheel={handleWheel}
@@ -155,7 +150,7 @@ function Canvas({size}: Props) {
             strokeWidth={8}
           />
         </Group>
-        <Circle fill={drawMode ? "blue" : "red"} radius={10} x={size.width/2} y={size.height/2} onClick={toggleMode} />
+        <Circle fill={drawMode ? "blue" : "red"} radius={10} x={width/2} y={height/2} onClick={toggleMode} />
       </Layer>
     </Stage>
   )
