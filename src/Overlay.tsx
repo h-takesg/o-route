@@ -3,6 +3,7 @@ import { Dispatch, SetStateAction, useState } from "react"
 import OpenWithIcon from '@mui/icons-material/OpenWith';
 import ModeIcon from '@mui/icons-material/Mode';
 import ClearIcon from '@mui/icons-material/Clear';
+import {FaEraser} from 'react-icons/fa';
 import { Mode } from "./types";
 
 type Props = {
@@ -42,7 +43,7 @@ function Overlay({mode, setMode}: Props) {
           <ModeIcon fontSize="large" />
         </ToggleButton>
         <ToggleButton value="erase">
-          <ClearIcon fontSize="large" />
+          <FaEraser style={{fontSize: "1.7rem"}}/>
         </ToggleButton>
       </ToggleButtonGroup>
     </>
