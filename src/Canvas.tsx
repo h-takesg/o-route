@@ -35,10 +35,19 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
   const rotateAt = (x: number, y: number, degree: number) => {
     const stage = stageRef.current;
     const group = groupRef.current;
-    const angleRadian = degree * Math.PI / 180;
 
+    const snappingDegree = 90;
+    
     if (stage === null) return;
     if (group === null) return;   
+    
+    // snappingDegreeごとにスナップを付ける
+    let snappedDegree;
+    if ((group.rotation() + degree + snappingDegree) % snappingDegree > snappingDegree - 1) snappedDegree = degree + (snappingDegree - ((group.rotation() + degree) % snappingDegree));
+    else if ((group.rotation() + degree + snappingDegree) % snappingDegree < 1) snappedDegree = degree - ((group.rotation() + degree) % snappingDegree);
+    else snappedDegree = degree;
+
+    const angleRadian = snappedDegree * Math.PI / 180;
 
     const newX =  x +
                   (group.x() - x) * Math.cos(angleRadian) - 
@@ -47,7 +56,7 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
                   (group.x() - x) * Math.sin(angleRadian) +
                   (group.y() - y) * Math.cos(angleRadian);
     group.position({x: newX, y: newY});
-    group.rotation((group.rotation() + degree)%360);
+    group.rotation((group.rotation() + snappedDegree)%360);
   }
 
   const handleMousemove = (event: Konva.KonvaEventObject<MouseEvent>) => {
