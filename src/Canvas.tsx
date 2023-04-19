@@ -1,27 +1,24 @@
 import Konva from "konva"
-import { KeyboardEvent, useEffect, useRef, useState } from "react"
+import { Dispatch, KeyboardEvent, SetStateAction, useEffect, useRef, useState } from "react"
 import { Layer, Stage, Image, Circle, Group, Line } from "react-konva"
 import useImage from "use-image"
 import { useWindowSize } from "./hooks/useWindwosSize"
-import { Mode } from "./types"
+import { DrawLine, Mode } from "./types"
 import { Point, intersectsLineSegment } from "./math"
 
-const MapImage = () => {
-  const [image] = useImage('./samplemap.jpg')
+const MapImage = ({url}: {url:string}) => {
+  const [image] = useImage(url)
   return <Image image={image} />
 }
 
-type DrawLine = {
-  points: number[];
-  id: string;
-  compositionMode: "source-over" | "destination-out";
-}
-
 type Props = {
-  mode: Mode
+  imageUrl: string;
+  mode: Mode;
+  lines: DrawLine[];
+  setLines: Dispatch<SetStateAction<DrawLine[]>>;
 }
 
-function Canvas({mode}: Props) {
+function Canvas({imageUrl, mode, lines, setLines}: Props) {
   const [width, height] = useWindowSize();
   const stageRef = useRef<Konva.Stage>(null)
   const groupRef = useRef<Konva.Group>(null)
@@ -29,7 +26,6 @@ function Canvas({mode}: Props) {
   const rotateBy = 0.02;
   const [ctrlKey, setCtrlKey] = useState(false)
   const [drawingLine, setDrawingLine] = useState<DrawLine>({points:[], id: "drawing", compositionMode:"source-over"});
-  const [lines, setLines] = useState<DrawLine[]>([])
 
   // Canvasの座標で中心を指定しGroupをdegree回転させる
   const rotateAt = (x: number, y: number, degree: number) => {
@@ -49,13 +45,6 @@ function Canvas({mode}: Props) {
     group.position({x: newX, y: newY});
     group.rotation((group.rotation() + degree)%360);
   }
-
-  // const removeLine = (event: Konva.KonvaEventObject<MouseEvent>) => {
-  //   if (mode !== "erase") return;
-  //   if (event.evt.buttons === 0) return;
-
-  //   setLines(lines.filter(elem => elem.id !== event.target.attrs.id));
-  // }
 
   const handleMousemove = (event: Konva.KonvaEventObject<MouseEvent>) => {
     if (mode !== "draw" && mode !== "erase") return;
@@ -185,7 +174,7 @@ function Canvas({mode}: Props) {
           onMouseMove={handleMousemove}
           onMouseUp={handleMouseUp}
         >
-          <MapImage />
+          <MapImage url={imageUrl} />
           {lines.map((line) => 
             <Line
               key={line.id}
@@ -195,7 +184,6 @@ function Canvas({mode}: Props) {
               stroke={"red"}
               lineCap="round"
               strokeWidth={8}
-              // onMouseMove={removeLine}
           />)}
           <Line
             key="drawing"

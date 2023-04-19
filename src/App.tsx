@@ -1,15 +1,17 @@
 import { useState } from 'react';
 import Canvas from './Canvas'
 import { Overlay } from './Overlay'
-import { Mode } from './types';
+import { DrawLine, Mode } from './types';
 
 function App() {
   const [mode, setMode] = useState<Mode>("move");
+  const [lines, setLines] = useState<DrawLine[]>([]);
+  const [imageUrl, setImageUrl] = useState<string>('./samplemap.jpg');
 
   return (
     <>
-      <Canvas mode={mode} />
-      <Overlay mode={mode} setMode={setMode} />
+      <Canvas imageUrl={imageUrl} mode={mode} lines={lines} setLines={setLines} />
+      <Overlay mode={mode} setImageUrl={setImageUrl} setMode={setMode} setLines={setLines} />
     </>
   )
 }

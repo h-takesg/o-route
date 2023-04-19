@@ -1,22 +1,40 @@
 import { Box, ToggleButton, ToggleButtonGroup, css } from "@mui/material"
-import { Dispatch, SetStateAction, useState } from "react"
+import React, { ChangeEvent, Dispatch, SetStateAction, useRef } from "react"
 import OpenWithIcon from '@mui/icons-material/OpenWith';
 import ModeIcon from '@mui/icons-material/Mode';
 import ClearIcon from '@mui/icons-material/Clear';
 import ImageIcon from '@mui/icons-material/Image';
 import {FaEraser} from 'react-icons/fa';
-import { Mode } from "./types";
+import { DrawLine, Mode } from "./types";
 
 type Props = {
   mode: Mode
+  setImageUrl: Dispatch<SetStateAction<string>>
   setMode: Dispatch<SetStateAction<Mode>>
+  setLines: Dispatch<SetStateAction<DrawLine[]>>
 }
 
-function Overlay({mode, setMode}: Props) {
+function Overlay({mode, setImageUrl, setMode, setLines}: Props) {
+  const imageSelectButtonRef = useRef<HTMLInputElement>(null);
+
   const handleModeChange = (event: React.MouseEvent<HTMLElement>, nextView: Mode) => {
     if (nextView !== null) {
       setMode(nextView);
     }
+  }
+
+  const handleAllClearButton = () => {
+    setLines([]);
+  }
+
+  const handleImageSelect = (event: ChangeEvent<HTMLInputElement>) => {
+    console.log(event);
+    if(event.target.files === null || event.target.files.length !== 1) return;
+    setImageUrl(URL.createObjectURL(event.target.files[0]))
+  }
+
+  const handleImageSelectButton = () => {
+    imageSelectButtonRef.current?.click();
   }
 
   return (
@@ -54,24 +72,31 @@ function Overlay({mode, setMode}: Props) {
             <FaEraser style={{fontSize: "1.7rem"}}/>
           </ToggleButton>
         </ToggleButtonGroup>
-        <ToggleButton value="allclear" sx={{
-          background: "white",
-          margin: "0 1rem",
-          boxShadow: 20,
-          ":hover": {
-            background: "#f5f5f5"
-          }
-        }}>
+        <ToggleButton value="allclear"
+          sx={{
+            background: "white",
+            margin: "0 1rem",
+            boxShadow: 20,
+            ":hover": {
+              background: "#f5f5f5"
+            }
+          }}
+          onClick={handleAllClearButton}
+        >
           <ClearIcon fontSize="large"/>
         </ToggleButton>
-        <ToggleButton value="load" sx={{
-          background: "white",
-          margin: "1rem",
-          boxShadow: 20,
-          ":hover": {
-            background: "#f5f5f5"
-          }
-        }}>
+        <ToggleButton value="load" 
+          sx={{
+            background: "white",
+            margin: "1rem",
+            boxShadow: 20,
+            ":hover": {
+              background: "#f5f5f5"
+            }
+          }}
+          onClick={handleImageSelectButton}
+        >
+          <input ref={imageSelectButtonRef} type="file" hidden onChange={handleImageSelect}/>
           <ImageIcon fontSize="large"/>
         </ToggleButton>
       </Box>
