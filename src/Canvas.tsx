@@ -1,6 +1,6 @@
 import Konva from "konva"
 import { Dispatch, KeyboardEvent, SetStateAction, useEffect, useRef, useState } from "react"
-import { Layer, Stage, Image, Circle, Group, Line } from "react-konva"
+import { Layer, Stage, Image, Circle, Group, Line, Rect } from "react-konva"
 import useImage from "use-image"
 import { useWindowSize } from "./hooks/useWindwosSize"
 import { DrawLine, Mode } from "./types"
@@ -24,6 +24,10 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
   const groupRef = useRef<Konva.Group>(null)
   const scaleBy = 1.1;
   const rotateBy = 0.02;
+  const scaleMin = 0.1;
+  const scaleMax = 5;
+  const backgroundSize = 80000;
+  const backgroundOffset = backgroundSize * 2 / 5;
   const [ctrlKey, setCtrlKey] = useState(false)
   const [drawingLine, setDrawingLine] = useState<DrawLine>({points:[], id: "drawing", compositionMode:"source-over"});
 
@@ -143,7 +147,7 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
           x: (pointerX - group.x()) / oldScale,
           y: (pointerY - group.y()) / oldScale,
         }
-        const newScale = event.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy;
+        const newScale = Math.max(scaleMin, Math.min(event.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy, scaleMax));
         group.scale({ x: newScale, y: newScale});
         const newPos = {
           x: pointerX - mousePointTo.x * newScale,
@@ -174,6 +178,12 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
           onMouseMove={handleMousemove}
           onMouseUp={handleMouseUp}
         >
+          <Rect
+            height={backgroundSize}
+            width={backgroundSize}
+            offsetX={backgroundOffset}
+            offsetY={backgroundOffset}
+          />
           <MapImage url={imageUrl} />
           {lines.map((line) => 
             <Line
