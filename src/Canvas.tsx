@@ -43,8 +43,8 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
     
     // snappingDegreeごとにスナップを付ける
     let snappedDegree;
-    if ((group.rotation() + degree + snappingDegree) % snappingDegree > snappingDegree - 1) snappedDegree = degree + (snappingDegree - ((group.rotation() + degree) % snappingDegree));
-    else if ((group.rotation() + degree + snappingDegree) % snappingDegree < 1) snappedDegree = degree - ((group.rotation() + degree) % snappingDegree);
+    if ((group.rotation() + degree + 360) % snappingDegree > snappingDegree - 1) snappedDegree = degree + (snappingDegree - ((group.rotation() + degree) % snappingDegree));
+    else if ((group.rotation() + degree + 360) % snappingDegree < 1) snappedDegree = degree - ((group.rotation() + degree) % snappingDegree);
     else snappedDegree = degree;
 
     const angleRadian = snappedDegree * Math.PI / 180;
@@ -56,7 +56,7 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
                   (group.x() - x) * Math.sin(angleRadian) +
                   (group.y() - y) * Math.cos(angleRadian);
     group.position({x: newX, y: newY});
-    group.rotation((group.rotation() + snappedDegree)%360);
+    group.rotation((group.rotation() + snappedDegree + 360)%360);
   }
 
   const handleMousemove = (event: Konva.KonvaEventObject<MouseEvent>) => {
@@ -214,7 +214,7 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
             strokeWidth={8}
           />
         </Group>
-        <Circle fill="red" radius={10} x={width/2} y={height/2} />
+        {/* <Circle fill="red" radius={10} x={width/2} y={height/2} /> */}
       </Layer>
     </Stage>
   )
