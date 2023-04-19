@@ -1,10 +1,10 @@
 import Konva from "konva"
-import { Dispatch, KeyboardEvent, SetStateAction, useEffect, useRef, useState } from "react"
-import { Layer, Stage, Image, Circle, Group, Line, Rect } from "react-konva"
+import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
+import { Layer, Stage, Image, Group, Line, Rect } from "react-konva"
 import useImage from "use-image"
 import { useWindowSize } from "./hooks/useWindwosSize"
 import { DrawLine, Mode } from "./types"
-import { Point, intersectsLineSegment } from "./math"
+import { Point, intersectsLineSegment, rotateVector } from "./math"
 
 const MapImage = ({url}: {url:string}) => {
   const [image] = useImage(url)
@@ -22,123 +22,109 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
   const [width, height] = useWindowSize();
   const stageRef = useRef<Konva.Stage>(null)
   const groupRef = useRef<Konva.Group>(null)
-  const scaleBy = 1.1;
-  const rotateBy = 0.02;
-  const scaleMin = 0.1;
-  const scaleMax = 5;
-  const backgroundSize = 80000;
-  const backgroundOffset = backgroundSize * 2 / 5;
   const [ctrlKey, setCtrlKey] = useState(false)
   const [drawingLine, setDrawingLine] = useState<DrawLine>({points:[], id: "drawing", compositionMode:"source-over"});
+  const eraseMousemoveBeforePositionOnGroup = useRef<{x:number, y: number} | null>(null);
+  const SCALE_BY = 1.1;
+  const ROTATE_BY = 0.02;
+  const SCALE_MIN = 0.1;
+  const SCALE_MAX = 5;
+  const BACKGROUND_SIZE = 80000;
+  const BACKGROUND_OFFSET = BACKGROUND_SIZE * 2 / 5;
 
   // Canvasの座標で中心を指定しGroupをdegree回転させる
   const rotateAt = (x: number, y: number, degree: number) => {
-    const stage = stageRef.current;
     const group = groupRef.current;
-
-    const snappingDegree = 90;
-    
-    if (stage === null) return;
     if (group === null) return;   
-    
+
+    const SNAPPING_DEGREE = 90;
+
+    const originalPositiveRotatedDegree = group.rotation() + degree + 360;
+    // degreeが最も近いSNAPPING_DEGREEの倍数との差を求める
+    const delta = (originalPositiveRotatedDegree + SNAPPING_DEGREE / 2) % SNAPPING_DEGREE + SNAPPING_DEGREE / 2;
+
     // snappingDegreeごとにスナップを付ける
-    let snappedDegree;
-    if ((group.rotation() + degree + 360) % snappingDegree > snappingDegree - 1) snappedDegree = degree + (snappingDegree - ((group.rotation() + degree) % snappingDegree));
-    else if ((group.rotation() + degree + 360) % snappingDegree < 1) snappedDegree = degree - ((group.rotation() + degree) % snappingDegree);
-    else snappedDegree = degree;
+    const snappedDegree = (Math.abs(delta) < 1) ? degree - delta : degree;
 
-    const angleRadian = snappedDegree * Math.PI / 180;
+    const oldCenterToGroup = {
+      x: group.x() - x,
+      y: group.y() - y
+    }
+    const newCenterToGroup = rotateVector(oldCenterToGroup.x, oldCenterToGroup.y, snappedDegree);
 
-    const newX =  x +
-                  (group.x() - x) * Math.cos(angleRadian) - 
-                  (group.y() - y) * Math.sin(angleRadian);
-    const newY =  y +
-                  (group.x() - x) * Math.sin(angleRadian) +
-                  (group.y() - y) * Math.cos(angleRadian);
-    group.position({x: newX, y: newY});
-    group.rotation((group.rotation() + snappedDegree + 360)%360);
+    const newPosition = {
+      x: x + newCenterToGroup.x,
+      y: y + newCenterToGroup.y
+    } 
+    group.position(newPosition);
+    group.rotation((group.rotation() + snappedDegree)%360);
   }
 
   const handleMousemove = (event: Konva.KonvaEventObject<MouseEvent>) => {
     if (mode !== "draw" && mode !== "erase") return;
     if (event.evt.buttons === 0) return;
 
-    const stage = stageRef.current;
     const group = groupRef.current;
-    if (stage === null || group === null) return;
+    if (group === null) return;
 
-    const rotation = group.rotation();
-    const rotationRadian = rotation * Math.PI / 180;
-    const scale = group.scaleX();
-    const {x: pointerStageX, y: pointerStageY} = stage.getPointerPosition()!;
-    const mousePointTo = {
-      x: (pointerStageX - group.x()) / scale,
-      y: (pointerStageY - group.y()) / scale,
-    }
-
+    const pointerOnGroup = group.getRelativePointerPosition();
+    
     if (mode === "draw"){
-      const rotateCorrected = {
-        x: mousePointTo.x * Math.cos(-rotationRadian) - mousePointTo.y * Math.sin(-rotationRadian),
-        y: mousePointTo.x * Math.sin(-rotationRadian) + mousePointTo.y * Math.cos(-rotationRadian)
-      }
-  
-      setDrawingLine({points: [...drawingLine.points, rotateCorrected.x, rotateCorrected.y], id: "drawing",compositionMode: "source-over"})
+      setDrawingLine({points: [...drawingLine.points, pointerOnGroup.x, pointerOnGroup.y], id: "drawing",compositionMode: "source-over"});
     } else if(mode === "erase") {
-      const beforePointerPosition: Point = [event.evt.clientX - event.evt.movementX, event.evt.clientY - event.evt.movementY];
-      const beforeMousePointTo: Point = [
-        (beforePointerPosition[0] - group.x()) / scale,
-        (beforePointerPosition[1] - group.y()) / scale
-      ];
-      const beforeRotateCorrected: Point = [
-        beforeMousePointTo[0] * Math.cos(-rotationRadian) - beforeMousePointTo[1] * Math.sin(-rotationRadian),
-        beforeMousePointTo[0] * Math.sin(-rotationRadian) + beforeMousePointTo[1] * Math.cos(-rotationRadian)
-      ]
-      const mousePoint: Point = [
-        mousePointTo.x,
-        mousePointTo.y
-      ]
-      const mouseRotateCorrected: Point = [
-        mousePoint[0] * Math.cos(-rotationRadian) - mousePoint[1] * Math.sin(-rotationRadian),
-        mousePoint[0] * Math.sin(-rotationRadian) + mousePoint[1] * Math.cos(-rotationRadian)
-      ]
-
-      const toBeRemoved: string[] = [];
-
-      for (const line of lines) {
-        for (let i = 0; i < line.points.length/2 - 1; i++) {
-          if (intersectsLineSegment([beforeRotateCorrected, mouseRotateCorrected], [[line.points[i*2], line.points[i*2+1]],[line.points[i*2+2], line.points[i*2+3]]])) {
-            toBeRemoved.push(line.id);
-            break;
+      if (eraseMousemoveBeforePositionOnGroup.current !== null) {
+        const beforePoint: Point = [
+          eraseMousemoveBeforePositionOnGroup.current.x,
+          eraseMousemoveBeforePositionOnGroup.current.y
+        ];
+        const pointerPoint: Point = [
+          pointerOnGroup.x,
+          pointerOnGroup.y
+        ];
+        
+        const toBeRemoved: string[] = [];
+        
+        for (const line of lines) {
+          for (let i = 0; i < line.points.length/2 - 1; i++) {
+            if (intersectsLineSegment([beforePoint, pointerPoint], [[line.points[i*2], line.points[i*2+1]], [line.points[i*2+2], line.points[i*2+3]]])) {
+              toBeRemoved.push(line.id);
+              break;
+            }
           }
         }
+        setLines(lines.filter(elem => !toBeRemoved.includes(elem.id)));
       }
-      setLines(lines.filter(elem => !toBeRemoved.includes(elem.id)));
+      eraseMousemoveBeforePositionOnGroup.current = pointerOnGroup;
     }
-  }
-
-  const handleMouseUp = (event: Konva.KonvaEventObject<MouseEvent>) => {
-    if (event.evt.buttons !== 0) return;
-    if (drawingLine.points.length === 0) return;
-
-    const newLine = {
-      ...drawingLine,
-      id: Date.now().toString(),
-    }
-
-    setLines([...lines, newLine]);
-    setDrawingLine({points: [], id: "drawing", compositionMode: "source-over"});
   }
   
-  const handleKeydown = (event: KeyboardEvent) => {
-    if (event.ctrlKey) {
-      setCtrlKey(true)
+  const handleMouseUp = (event: Konva.KonvaEventObject<MouseEvent>) => {
+    if (event.evt.buttons !== 0) return;
+    
+    if(mode === "draw") {
+      if (drawingLine.points.length === 0) return;
+
+      const newLine = {
+        ...drawingLine,
+        id: Date.now().toString(),
+      }
+      setLines([...lines, newLine]);
+      setDrawingLine({points: [], id: "drawing", compositionMode: "source-over"});
+    } else if (mode === "erase") {
+      eraseMousemoveBeforePositionOnGroup.current = null;
     }
   }
+  
+  const handleKeydown = (event: Event) => {
+    if (!(event instanceof KeyboardEvent)) return;
 
-  const handleKeyup = (event: KeyboardEvent) => {
-    if (!event.ctrlKey) {
-      setCtrlKey(false)
-    }
+    setCtrlKey(event.ctrlKey);
+  }
+  
+  const handleKeyup = (event: Event) => {
+    if (!(event instanceof KeyboardEvent)) return;
+    
+    setCtrlKey(event.ctrlKey);
   }
 
   const handleWheel = (event: Konva.KonvaEventObject<WheelEvent>) => {
@@ -146,25 +132,24 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
     const stage = stageRef.current
     const group = groupRef.current
 
-    if (stage !== null && group !== null) {
-      if (event.evt.ctrlKey) {
-        rotateAt(width / 2, height / 2, event.evt.deltaY * rotateBy);
-      } else {
-        const oldScale = group.scaleX()
-        const { x: pointerX, y: pointerY } = stage.getPointerPosition()!;
-        const mousePointTo = {
-          x: (pointerX - group.x()) / oldScale,
-          y: (pointerY - group.y()) / oldScale,
-        }
-        const newScale = Math.max(scaleMin, Math.min(event.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy, scaleMax));
-        group.scale({ x: newScale, y: newScale});
-        const newPos = {
-          x: pointerX - mousePointTo.x * newScale,
-          y: pointerY - mousePointTo.y * newScale,
-        }
-        group.position(newPos);
-        stage.batchDraw();
-      } 
+    if(stage === null || group === null) return;
+
+    if (event.evt.ctrlKey) {
+      rotateAt(width / 2, height / 2, event.evt.deltaY * ROTATE_BY);
+    } else {
+      const oldScale = group.scaleX()
+      const pointerOnStage = stage.getPointerPosition()!;
+      const pointerOnGroupNoRotation = {
+        x: (pointerOnStage.x - group.x()) / oldScale,
+        y: (pointerOnStage.y - group.y()) / oldScale
+      };
+      const newScale = Math.max(SCALE_MIN, Math.min(event.evt.deltaY > 0 ? oldScale / SCALE_BY : oldScale * SCALE_BY, SCALE_MAX));
+      group.scale({ x: newScale, y: newScale});
+      const newPos = {
+        x: pointerOnStage.x - pointerOnGroupNoRotation.x * newScale,
+        y: pointerOnStage.y - pointerOnGroupNoRotation.y * newScale,
+      }
+      group.position(newPos);
     }
   }
 
@@ -188,10 +173,10 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
           onMouseUp={handleMouseUp}
         >
           <Rect
-            height={backgroundSize}
-            width={backgroundSize}
-            offsetX={backgroundOffset}
-            offsetY={backgroundOffset}
+            height={BACKGROUND_SIZE}
+            width={BACKGROUND_SIZE}
+            offsetX={BACKGROUND_OFFSET}
+            offsetY={BACKGROUND_OFFSET}
           />
           <MapImage url={imageUrl} />
           {lines.map((line) => 
@@ -205,7 +190,6 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
               strokeWidth={8}
           />)}
           <Line
-            key="drawing"
             id="drawing"
             points={drawingLine.points}
             globalCompositeOperation={drawingLine.compositionMode}
@@ -214,7 +198,6 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
             strokeWidth={8}
           />
         </Group>
-        {/* <Circle fill="red" radius={10} x={width/2} y={height/2} /> */}
       </Layer>
     </Stage>
   )

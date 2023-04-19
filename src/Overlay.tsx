@@ -1,4 +1,4 @@
-import { Box, ToggleButton, ToggleButtonGroup, css } from "@mui/material"
+import { Box, ToggleButton, ToggleButtonGroup } from "@mui/material"
 import React, { ChangeEvent, Dispatch, SetStateAction, useRef } from "react"
 import OpenWithIcon from '@mui/icons-material/OpenWith';
 import ModeIcon from '@mui/icons-material/Mode';
@@ -8,10 +8,10 @@ import {FaEraser} from 'react-icons/fa';
 import { DrawLine, Mode } from "./types";
 
 type Props = {
-  mode: Mode
-  setImageUrl: Dispatch<SetStateAction<string>>
-  setMode: Dispatch<SetStateAction<Mode>>
-  setLines: Dispatch<SetStateAction<DrawLine[]>>
+  mode: Mode;
+  setImageUrl: Dispatch<SetStateAction<string>>;
+  setMode: Dispatch<SetStateAction<Mode>>;
+  setLines: Dispatch<SetStateAction<DrawLine[]>>;
 }
 
 function Overlay({mode, setImageUrl, setMode, setLines}: Props) {
@@ -29,7 +29,8 @@ function Overlay({mode, setImageUrl, setMode, setLines}: Props) {
 
   const handleImageSelect = (event: ChangeEvent<HTMLInputElement>) => {
     if(event.target.files === null || event.target.files.length !== 1) return;
-    setImageUrl(URL.createObjectURL(event.target.files[0]))
+
+    setImageUrl(URL.createObjectURL(event.target.files[0]));
   }
 
   const handleImageSelectButton = () => {
