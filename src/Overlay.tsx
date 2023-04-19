@@ -28,7 +28,6 @@ function Overlay({mode, setImageUrl, setMode, setLines}: Props) {
   }
 
   const handleImageSelect = (event: ChangeEvent<HTMLInputElement>) => {
-    console.log(event);
     if(event.target.files === null || event.target.files.length !== 1) return;
     setImageUrl(URL.createObjectURL(event.target.files[0]))
   }
