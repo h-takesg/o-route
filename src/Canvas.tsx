@@ -3,8 +3,11 @@ import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
 import { Layer, Stage, Image, Group, Line, Rect } from "react-konva"
 import useImage from "use-image"
 import { useWindowSize } from "./hooks/useWindwosSize"
-import { DrawLine, Mode } from "./types"
+import { Lines, Mode } from "./types"
 import { Point, intersectsLineSegment, rotateVector } from "./math"
+import { DatabaseReference, child, off, onValue, push, remove, set, update } from "firebase/database";
+import { FirebaseApp } from "firebase/app"
+import { useDatabaseRef } from "./hooks/useDatabaseRef"
 
 const MapImage = ({url}: {url:string}) => {
   const [image] = useImage(url)
@@ -14,16 +17,19 @@ const MapImage = ({url}: {url:string}) => {
 type Props = {
   imageUrl: string;
   mode: Mode;
-  lines: DrawLine[];
-  setLines: Dispatch<SetStateAction<DrawLine[]>>;
+  lines: Lines;
+  setLines: Dispatch<SetStateAction<Lines>>;
+  roomId: string;
+  firebaseApp: FirebaseApp;
 }
 
-function Canvas({imageUrl, mode, lines, setLines}: Props) {
+function Canvas({imageUrl, mode, lines, setLines, roomId, firebaseApp}: Props) {
   const [width, height] = useWindowSize();
   const stageRef = useRef<Konva.Stage>(null)
   const groupRef = useRef<Konva.Group>(null)
   const [ctrlKey, setCtrlKey] = useState(false)
-  const [drawingLine, setDrawingLine] = useState<DrawLine>({points:[], id: "drawing", compositionMode:"source-over"});
+  const drawingLineRef = useRef<DatabaseReference | null>(null);
+  const linesRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/lines`);
   const eraseMousemoveBeforePositionOnGroup = useRef<{x:number, y: number} | null>(null);
   const dragVelocity = useRef({x: 0, y: 0});
   const dragMomentum = useRef<Konva.Tween | null>(null);
@@ -111,7 +117,20 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
     const pointerOnGroup = group.getRelativePointerPosition();
     
     if (mode === "draw"){
-      setDrawingLine({points: [...drawingLine.points, pointerOnGroup.x, pointerOnGroup.y], id: "drawing",compositionMode: "source-over"});
+      if (typeof linesRef === "undefined") return;
+
+      if (drawingLineRef.current === null) {
+        drawingLineRef.current = push(linesRef);
+        set(drawingLineRef.current, {
+          timestamp: Date.now().toString(),
+          points: [pointerOnGroup.x, pointerOnGroup.y],
+          compositionMode: "source-over"
+        });
+      } else {
+        update(drawingLineRef.current, {
+          points: [...lines[drawingLineRef.current.key!].points, pointerOnGroup.x, pointerOnGroup.y]
+        });
+      }
     } else if(mode === "erase") {
       if (eraseMousemoveBeforePositionOnGroup.current !== null) {
         const beforePoint: Point = [
@@ -125,15 +144,17 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
         
         const toBeRemoved: string[] = [];
         
-        for (const line of lines) {
+        for (const key in lines) {
+          const line = lines[key];
           for (let i = 0; i < line.points.length/2 - 1; i++) {
             if (intersectsLineSegment([beforePoint, pointerPoint], [[line.points[i*2], line.points[i*2+1]], [line.points[i*2+2], line.points[i*2+3]]])) {
-              toBeRemoved.push(line.id);
+              toBeRemoved.push(key);
               break;
             }
           }
         }
-        setLines(lines.filter(elem => !toBeRemoved.includes(elem.id)));
+        
+        toBeRemoved.forEach(id => remove(child(linesRef!, id)));
       }
       eraseMousemoveBeforePositionOnGroup.current = pointerOnGroup;
     }
@@ -143,14 +164,7 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
     if (event.evt.buttons !== 0) return;
     
     if(mode === "draw") {
-      if (drawingLine.points.length === 0) return;
-
-      const newLine = {
-        ...drawingLine,
-        id: Date.now().toString(),
-      }
-      setLines([...lines, newLine]);
-      setDrawingLine({points: [], id: "drawing", compositionMode: "source-over"});
+      drawingLineRef.current = null;
     } else if (mode === "erase") {
       eraseMousemoveBeforePositionOnGroup.current = null;
     }
@@ -198,9 +212,18 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
   }
 
   useEffect(() => {
-    document.addEventListener("keydown", handleKeydown, false)
-    document.addEventListener("keyup", handleKeyup, false)
-  }, [])
+    document.addEventListener("keydown", handleKeydown, false);
+    document.addEventListener("keyup", handleKeyup, false);
+  }, []);
+
+  useEffect(() => {
+    if (typeof linesRef !== "undefined"){
+      onValue(linesRef, (snapshot) => {
+        setLines(snapshot.val());
+      });
+      return () => off(linesRef);
+    }
+  }, [linesRef]);
 
   return (
     <Stage
@@ -226,24 +249,16 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
             offsetY={BACKGROUND_OFFSET}
           />
           <MapImage url={imageUrl} />
-          {lines.map((line) => 
+          {Object.entries(lines).map(([key,line]) => 
             <Line
-              key={line.id}
-              id={line.id}
+              key={key}
+              id={key}
               points={line.points}
               globalCompositeOperation={line.compositionMode}
               stroke={"red"}
               lineCap="round"
               strokeWidth={8}
           />)}
-          <Line
-            id="drawing"
-            points={drawingLine.points}
-            globalCompositeOperation={drawingLine.compositionMode}
-            stroke={"blue"}
-            lineCap="round"
-            strokeWidth={8}
-          />
         </Group>
       </Layer>
     </Stage>

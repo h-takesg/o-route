@@ -2,6 +2,10 @@ export type Mode = "move" | "draw" | "erase";
 
 export type DrawLine = {
   points: number[];
-  id: string;
+  timestamp: string;
   compositionMode: "source-over" | "destination-out";
+}
+
+export type Lines = {
+  [key: string]: DrawLine;
 }

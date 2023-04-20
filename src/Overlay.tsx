@@ -5,13 +5,13 @@ import ModeIcon from '@mui/icons-material/Mode';
 import ClearIcon from '@mui/icons-material/Clear';
 import ImageIcon from '@mui/icons-material/Image';
 import {FaEraser} from 'react-icons/fa';
-import { DrawLine, Mode } from "./types";
+import { Lines, Mode } from "./types";
 
 type Props = {
   mode: Mode;
   setImageUrl: Dispatch<SetStateAction<string>>;
   setMode: Dispatch<SetStateAction<Mode>>;
-  setLines: Dispatch<SetStateAction<DrawLine[]>>;
+  setLines: Dispatch<SetStateAction<Lines>>;
 }
 
 function Overlay({mode, setImageUrl, setMode, setLines}: Props) {
@@ -24,7 +24,7 @@ function Overlay({mode, setImageUrl, setMode, setLines}: Props) {
   }
 
   const handleAllClearButton = () => {
-    setLines([]);
+    setLines({});
   }
 
   const handleImageSelect = (event: ChangeEvent<HTMLInputElement>) => {
