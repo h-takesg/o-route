@@ -1,5 +1,5 @@
 import Konva from "konva"
-import { Dispatch, SetStateAction, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Layer, Stage, Image, Group, Line, Rect } from "react-konva"
 import useImage from "use-image"
 import { useWindowSize } from "./hooks/useWindwosSize"
@@ -8,6 +8,7 @@ import { Point, intersectsLineSegment, rotateVector } from "./math"
 import { DatabaseReference, child, off, onValue, push, remove, set, update } from "firebase/database";
 import { FirebaseApp } from "firebase/app"
 import { useDatabaseRef } from "./hooks/useDatabaseRef"
+import { Overlay } from "./Overlay"
 
 const MapImage = ({url}: {url:string}) => {
   const [image] = useImage(url)
@@ -15,16 +16,15 @@ const MapImage = ({url}: {url:string}) => {
 }
 
 type Props = {
-  imageUrl: string;
-  mode: Mode;
-  lines: Lines;
-  setLines: Dispatch<SetStateAction<Lines>>;
   roomId: string;
   firebaseApp: FirebaseApp;
 }
 
-function Canvas({imageUrl, mode, lines, setLines, roomId, firebaseApp}: Props) {
+function Canvas({roomId, firebaseApp}: Props) {
   const [width, height] = useWindowSize();
+  const [imageUrl, setImageUrl] = useState<string>('./samplemap.jpg');
+  const [mode, setMode] = useState<Mode>("move");
+  const [lines, setLines] = useState<Lines>({});
   const stageRef = useRef<Konva.Stage>(null)
   const groupRef = useRef<Konva.Group>(null)
   const [ctrlKey, setCtrlKey] = useState(false)
@@ -66,6 +66,10 @@ function Canvas({imageUrl, mode, lines, setLines, roomId, firebaseApp}: Props) {
     } 
     group.position(newPosition);
     group.rotation((group.rotation() + snappedDegree)%360);
+  }
+
+  const clearAllLines = () => {
+    remove(linesRef!);
   }
   
   const handleDragMove = (event: Konva.KonvaEventObject<DragEvent>) => {
@@ -219,49 +223,52 @@ function Canvas({imageUrl, mode, lines, setLines, roomId, firebaseApp}: Props) {
   useEffect(() => {
     if (typeof linesRef !== "undefined"){
       onValue(linesRef, (snapshot) => {
-        setLines(snapshot.val());
+        setLines(snapshot.val() ?? {});
       });
       return () => off(linesRef);
     }
   }, [linesRef]);
 
   return (
-    <Stage
-      height={height}
-      width={width}
-      ref={stageRef}
-      onWheel={handleWheel}
-    >
-      <Layer>
-        <Group
-          ref={groupRef}
-          draggable={mode === "move" && !ctrlKey}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMousemove}
-          onMouseUp={handleMouseUp}
-          onDragMove={handleDragMove}
-          onDragEnd={handleDragEnd}
-        >
-          <Rect
-            height={BACKGROUND_SIZE}
-            width={BACKGROUND_SIZE}
-            offsetX={BACKGROUND_OFFSET}
-            offsetY={BACKGROUND_OFFSET}
-          />
-          <MapImage url={imageUrl} />
-          {Object.entries(lines).map(([key,line]) => 
-            <Line
-              key={key}
-              id={key}
-              points={line.points}
-              globalCompositeOperation={line.compositionMode}
-              stroke={"red"}
-              lineCap="round"
-              strokeWidth={8}
-          />)}
-        </Group>
-      </Layer>
-    </Stage>
+    <>
+      <Stage
+        height={height}
+        width={width}
+        ref={stageRef}
+        onWheel={handleWheel}
+      >
+        <Layer>
+          <Group
+            ref={groupRef}
+            draggable={mode === "move" && !ctrlKey}
+            onMouseDown={handleMouseDown}
+            onMouseMove={handleMousemove}
+            onMouseUp={handleMouseUp}
+            onDragMove={handleDragMove}
+            onDragEnd={handleDragEnd}
+          >
+            <Rect
+              height={BACKGROUND_SIZE}
+              width={BACKGROUND_SIZE}
+              offsetX={BACKGROUND_OFFSET}
+              offsetY={BACKGROUND_OFFSET}
+            />
+            <MapImage url={imageUrl} />
+            {Object.entries(lines).map(([key,line]) => 
+              <Line
+                key={key}
+                id={key}
+                points={line.points}
+                globalCompositeOperation={line.compositionMode}
+                stroke={"red"}
+                lineCap="round"
+                strokeWidth={8}
+            />)}
+          </Group>
+        </Layer>
+      </Stage>
+      <Overlay mode={mode} setImageUrl={setImageUrl} setMode={setMode} clearAllLines={clearAllLines} />
+    </>
   )
 }
 

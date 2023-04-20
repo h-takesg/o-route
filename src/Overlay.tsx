@@ -11,10 +11,10 @@ type Props = {
   mode: Mode;
   setImageUrl: Dispatch<SetStateAction<string>>;
   setMode: Dispatch<SetStateAction<Mode>>;
-  setLines: Dispatch<SetStateAction<Lines>>;
+  clearAllLines: () => void;
 }
 
-function Overlay({mode, setImageUrl, setMode, setLines}: Props) {
+function Overlay({mode, setImageUrl, setMode, clearAllLines}: Props) {
   const imageSelectButtonRef = useRef<HTMLInputElement>(null);
 
   const handleModeChange = (event: React.MouseEvent<HTMLElement>, nextView: Mode) => {
@@ -24,7 +24,7 @@ function Overlay({mode, setImageUrl, setMode, setLines}: Props) {
   }
 
   const handleAllClearButton = () => {
-    setLines({});
+    clearAllLines();
   }
 
   const handleImageSelect = (event: ChangeEvent<HTMLInputElement>) => {

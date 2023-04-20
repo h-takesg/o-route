@@ -1,14 +1,7 @@
-import { useState, useEffect } from 'react';
 import Canvas from './Canvas'
-import { Overlay } from './Overlay'
-import { Lines, Mode } from './types';
 import { initializeApp} from "firebase/app";
 
 function App() {
-  const [mode, setMode] = useState<Mode>("move");
-  const [lines, setLines] = useState<Lines>({});
-  const [imageUrl, setImageUrl] = useState<string>('./samplemap.jpg');
-
   const roomId = "hoge";
   
   const firebaseConfig = {
@@ -25,8 +18,7 @@ function App() {
 
   return (
     <>
-      <Canvas imageUrl={imageUrl} mode={mode} lines={lines!} setLines={setLines} roomId={roomId} firebaseApp={firebaseApp}/>
-      <Overlay mode={mode} setImageUrl={setImageUrl} setMode={setMode} setLines={setLines} />
+      <Canvas roomId={roomId} firebaseApp={firebaseApp}/>
     </>
   )
 }
