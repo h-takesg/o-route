@@ -25,6 +25,8 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
   const [ctrlKey, setCtrlKey] = useState(false)
   const [drawingLine, setDrawingLine] = useState<DrawLine>({points:[], id: "drawing", compositionMode:"source-over"});
   const eraseMousemoveBeforePositionOnGroup = useRef<{x:number, y: number} | null>(null);
+  const dragVelocity = useRef({x: 0, y: 0});
+  const dragMomentum = useRef<Konva.Tween | null>(null);
   const SCALE_BY = 1.1;
   const ROTATE_BY = 0.02;
   const SCALE_MIN = 0.1;
@@ -58,6 +60,45 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
     } 
     group.position(newPosition);
     group.rotation((group.rotation() + snappedDegree)%360);
+  }
+  
+  const handleDragMove = (event: Konva.KonvaEventObject<DragEvent>) => {
+    dragVelocity.current = {x: -event.evt.movementX, y: -event.evt.movementY};
+  }
+  
+  const handleDragEnd = (event: Konva.KonvaEventObject<DragEvent>) => {
+    const group = groupRef.current;
+    if (group === null) return;
+    
+    const FLICTION = 10; // 時間的止まりやすさ
+    const WEIGHT = 500; // 慣性の強さ
+    const signAX = -1 * Math.sign(dragVelocity.current.x);
+    const signAY = -1 * Math.sign(dragVelocity.current.y);
+    const dragSpeed = Math.sqrt(dragVelocity.current.x ** 2 + dragVelocity.current.y ** 2); // 速さ
+    const stoppingDuration = Math.sqrt(dragSpeed) / FLICTION; // 停止までの時間
+    const stoppingDistanceX = (Math.sqrt(Math.abs(dragVelocity.current.x)/100) * WEIGHT) * signAX;
+    const stoppingDistanceY = (Math.sqrt(Math.abs(dragVelocity.current.y)/100) * WEIGHT) * signAY;  
+
+    if (dragSpeed > 5) {
+      dragMomentum.current =  new Konva.Tween({
+        node: group,
+        duration: stoppingDuration,
+        x: group.x() + (stoppingDistanceX || 0),
+        y: group.y() + (stoppingDistanceY || 0),
+        easing: Konva.Easings.EaseOut,
+      }).play();
+    }
+    
+    dragVelocity.current = {x: 0, y: 0};
+  }
+  
+  const handleMouseDown = (event: Konva.KonvaEventObject<MouseEvent>) => {
+    if (mode !== "move") return;
+    
+    if (dragMomentum.current !== null) {
+      dragMomentum.current.destroy();
+      dragMomentum.current = null;
+    }
   }
 
   const handleMousemove = (event: Konva.KonvaEventObject<MouseEvent>) => {
@@ -134,6 +175,9 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
 
     if(stage === null || group === null) return;
 
+    // 慣性を止める
+    dragMomentum.current?.destroy();
+
     if (event.evt.ctrlKey) {
       rotateAt(width / 2, height / 2, event.evt.deltaY * ROTATE_BY);
     } else {
@@ -169,8 +213,11 @@ function Canvas({imageUrl, mode, lines, setLines}: Props) {
         <Group
           ref={groupRef}
           draggable={mode === "move" && !ctrlKey}
+          onMouseDown={handleMouseDown}
           onMouseMove={handleMousemove}
           onMouseUp={handleMouseUp}
+          onDragMove={handleDragMove}
+          onDragEnd={handleDragEnd}
         >
           <Rect
             height={BACKGROUND_SIZE}
