@@ -5,7 +5,7 @@ import useImage from "use-image"
 import { useWindowSize } from "./hooks/useWindwosSize"
 import { Lines, Mode } from "./types"
 import { Point, intersectsLineSegment, rotateVector } from "./math"
-import { DatabaseReference, child, off, onValue, push, remove, set, update } from "firebase/database";
+import { DatabaseReference, child, off, onChildAdded, onChildChanged, onChildRemoved, push, remove, set, update } from "firebase/database";
 import { FirebaseApp } from "firebase/app"
 import { useDatabaseRef } from "./hooks/useDatabaseRef"
 import { Overlay } from "./Overlay"
@@ -222,8 +222,21 @@ function Canvas({roomId, firebaseApp}: Props) {
 
   useEffect(() => {
     if (typeof linesRef !== "undefined"){
-      onValue(linesRef, (snapshot) => {
-        setLines(snapshot.val() ?? {});
+      onChildAdded(linesRef, (snapshot) => {
+        console.log("add");
+        setLines(oldLines => ({...oldLines, [snapshot.key!]: snapshot.val()}));
+      });
+      onChildChanged(linesRef, (snapshot) => {
+        console.log("change");
+        setLines(oldLines => ({...oldLines, [snapshot.key!]: snapshot.val()}));
+      });
+      onChildRemoved(linesRef, (snapshot) => {
+        console.log("remove", snapshot);
+        setLines(oldLines => {
+          const temp = {...oldLines};
+          delete temp[snapshot.key!];
+          return temp;
+        })
       });
       return () => off(linesRef);
     }
