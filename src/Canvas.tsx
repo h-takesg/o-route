@@ -3,9 +3,9 @@ import { useEffect, useRef, useState } from "react"
 import { Layer, Stage, Image, Group, Line, Rect } from "react-konva"
 import useImage from "use-image"
 import { useWindowSize } from "./hooks/useWindwosSize"
-import { Lines, Mode } from "./types"
+import { DrawLine, Lines, Mode } from "./types"
 import { Point, intersectsLineSegment, rotateVector } from "./math"
-import { DatabaseReference, child, off, onChildAdded, onChildChanged, onChildRemoved, push, remove, set, update } from "firebase/database";
+import { DataSnapshot, DatabaseReference, child, off, onChildAdded, onChildRemoved, onValue, push, remove, set, update } from "firebase/database";
 import { FirebaseApp } from "firebase/app"
 import { useDatabaseRef } from "./hooks/useDatabaseRef"
 import { Overlay } from "./Overlay"
@@ -124,15 +124,38 @@ function Canvas({roomId, firebaseApp}: Props) {
       if (typeof linesRef === "undefined") return;
 
       if (drawingLineRef.current === null) {
-        drawingLineRef.current = push(linesRef);
-        set(drawingLineRef.current, {
+        const newLine: DrawLine = {
+          isDrawing: true,
           timestamp: Date.now().toString(),
           points: [pointerOnGroup.x, pointerOnGroup.y],
           compositionMode: "source-over"
+        }
+        drawingLineRef.current = push(linesRef);
+
+        // for upload
+        set(drawingLineRef.current, newLine);
+
+        // for local
+        setLines({
+          ...lines,
+          [drawingLineRef.current.key!]: newLine
         });
       } else {
-        update(drawingLineRef.current, {
-          points: [...lines[drawingLineRef.current.key!].points, pointerOnGroup.x, pointerOnGroup.y]
+        const oldLine = lines[drawingLineRef.current.key!];
+        const oldLength = oldLine.points.length;
+        
+        // for upload
+        update(child(drawingLineRef.current, "points"),{
+          [oldLength]: pointerOnGroup.x,
+          [oldLength + 1]: pointerOnGroup.y
+        });
+        
+        // for local
+        const newLine = {...oldLine};
+        newLine.points = [...oldLine.points, pointerOnGroup.x, pointerOnGroup.y];
+        setLines({
+          ...lines,
+          [drawingLineRef.current.key!]: newLine
         });
       }
     } else if(mode === "erase") {
@@ -168,6 +191,7 @@ function Canvas({roomId, firebaseApp}: Props) {
     if (event.evt.buttons !== 0) return;
     
     if(mode === "draw") {
+      set(child(drawingLineRef.current!, "isDrawing"), false);
       drawingLineRef.current = null;
     } else if (mode === "erase") {
       eraseMousemoveBeforePositionOnGroup.current = null;
@@ -220,18 +244,36 @@ function Canvas({roomId, firebaseApp}: Props) {
     document.addEventListener("keyup", handleKeyup, false);
   }, []);
 
+  const addNewPointFactory = (lineKey: string) => {
+    return (snapshot: DataSnapshot) => {
+      setLines(oldLines => {
+        const targetLine = {...oldLines[lineKey]};
+        targetLine.points = [...targetLine.points, snapshot.val()];
+        return {
+          ...oldLines,
+          [lineKey]: targetLine
+        }
+      });
+    }
+  }
+
   useEffect(() => {
     if (typeof linesRef !== "undefined"){
       onChildAdded(linesRef, (snapshot) => {
-        console.log("add");
         setLines(oldLines => ({...oldLines, [snapshot.key!]: snapshot.val()}));
-      });
-      onChildChanged(linesRef, (snapshot) => {
-        console.log("change");
-        setLines(oldLines => ({...oldLines, [snapshot.key!]: snapshot.val()}));
+
+        // 自分以外の線なら以降の更新をlistenする
+        if (drawingLineRef.current?.key !== snapshot.key && snapshot.val().isDrawing) {
+          onChildAdded(child(linesRef, `${snapshot.key}/points`), addNewPointFactory(snapshot.key!));
+          onValue(child(linesRef, `${snapshot.key}/isDrawing`), (snapshotIsDrawing) => {
+            if (!snapshotIsDrawing.val()) {
+              off(child(linesRef, `${snapshot.key}/isDrawing`));
+              off(child(linesRef, `${snapshot.key}/points`));
+            }
+          })
+        }
       });
       onChildRemoved(linesRef, (snapshot) => {
-        console.log("remove", snapshot);
         setLines(oldLines => {
           const temp = {...oldLines};
           delete temp[snapshot.key!];
