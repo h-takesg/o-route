@@ -6,6 +6,7 @@ import { useWindowSize } from "./hooks/useWindwosSize"
 import { DrawLine, Lines, Mode } from "./types"
 import { Point, intersectsLineSegment, rotateVector } from "./math"
 import { DataSnapshot, DatabaseReference, child, off, onChildAdded, onChildRemoved, onValue, push, remove, set, update } from "firebase/database";
+import { getStorage, ref } from "firebase/storage";
 import { FirebaseApp } from "firebase/app"
 import { useDatabaseRef } from "./hooks/useDatabaseRef"
 import { Overlay } from "./Overlay"
@@ -30,6 +31,8 @@ function Canvas({roomId, firebaseApp}: Props) {
   const [ctrlKey, setCtrlKey] = useState(false)
   const drawingLineRef = useRef<DatabaseReference | null>(null);
   const linesRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/lines`);
+  const imageUrlRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/image`);
+  const storageRoomRef = useRef(ref(getStorage(firebaseApp), roomId));
   const eraseMousemoveBeforePositionOnGroup = useRef<{x:number, y: number} | null>(null);
   const dragVelocity = useRef({x: 0, y: 0});
   const dragMomentum = useRef<Konva.Tween | null>(null);
@@ -244,6 +247,14 @@ function Canvas({roomId, firebaseApp}: Props) {
     document.addEventListener("keyup", handleKeyup, false);
   }, []);
 
+  useEffect(() => {
+    if(typeof imageUrlRef !== "undefined") {
+      onValue(imageUrlRef, (snapshot) => {
+        if (snapshot.val() !== null) setImageUrl(snapshot.val());
+      });
+    }
+  });
+
   const addNewPointFactory = (lineKey: string) => {
     return (snapshot: DataSnapshot) => {
       setLines(oldLines => {
@@ -322,7 +333,13 @@ function Canvas({roomId, firebaseApp}: Props) {
           </Group>
         </Layer>
       </Stage>
-      <Overlay mode={mode} setImageUrl={setImageUrl} setMode={setMode} clearAllLines={clearAllLines} />
+      <Overlay 
+        mode={mode}
+        imageUrlRef={imageUrlRef!}
+        setMode={setMode}
+        clearAllLines={clearAllLines}
+        storageRoomRef={storageRoomRef.current}
+       />
     </>
   )
 }

@@ -1,21 +1,25 @@
-import { Box, ToggleButton, ToggleButtonGroup } from "@mui/material"
-import React, { ChangeEvent, Dispatch, SetStateAction, useRef } from "react"
+import { Box, CircularProgress, ToggleButton, ToggleButtonGroup } from "@mui/material"
+import React, { ChangeEvent, Dispatch, SetStateAction, useRef, useState } from "react"
 import OpenWithIcon from '@mui/icons-material/OpenWith';
 import ModeIcon from '@mui/icons-material/Mode';
 import ClearIcon from '@mui/icons-material/Clear';
 import ImageIcon from '@mui/icons-material/Image';
 import {FaEraser} from 'react-icons/fa';
-import { Lines, Mode } from "./types";
+import { Mode } from "./types";
+import { StorageReference, getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { DatabaseReference, set } from "firebase/database";
 
 type Props = {
   mode: Mode;
-  setImageUrl: Dispatch<SetStateAction<string>>;
+  imageUrlRef: DatabaseReference;
   setMode: Dispatch<SetStateAction<Mode>>;
   clearAllLines: () => void;
+  storageRoomRef: StorageReference;
 }
 
-function Overlay({mode, setImageUrl, setMode, clearAllLines}: Props) {
+function Overlay({mode, imageUrlRef, setMode, clearAllLines, storageRoomRef}: Props) {
   const imageSelectButtonRef = useRef<HTMLInputElement>(null);
+  const [isImageUploading, setIsImageUploading] = useState(false);
 
   const handleModeChange = (event: React.MouseEvent<HTMLElement>, nextView: Mode) => {
     if (nextView !== null) {
@@ -27,10 +31,20 @@ function Overlay({mode, setImageUrl, setMode, clearAllLines}: Props) {
     clearAllLines();
   }
 
-  const handleImageSelect = (event: ChangeEvent<HTMLInputElement>) => {
-    if(event.target.files === null || event.target.files.length !== 1) return;
+  const handleImageSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files === null || event.target.files.length !== 1) return;
 
-    setImageUrl(URL.createObjectURL(event.target.files[0]));
+    const selectedFile = event.target.files[0];
+
+    const ACCEPT_FILETYPE_REGEX = /^image\/.*/;
+    if (!ACCEPT_FILETYPE_REGEX.test(selectedFile.type)) return;
+
+    const newRef = ref(storageRoomRef, Date.now().toString());
+    setIsImageUploading(true);
+    await uploadBytes(newRef, event.target.files[0]);
+    setIsImageUploading(false);
+    const newUrl = await getDownloadURL(newRef);
+    set(imageUrlRef, newUrl);
   }
 
   const handleImageSelectButton = () => {
@@ -96,8 +110,10 @@ function Overlay({mode, setImageUrl, setMode, clearAllLines}: Props) {
           }}
           onClick={handleImageSelectButton}
         >
-          <input ref={imageSelectButtonRef} type="file" hidden onChange={handleImageSelect}/>
-          <ImageIcon fontSize="large"/>
+          <input ref={imageSelectButtonRef} type="file" accept="image/*" hidden onChange={handleImageSelect}/>
+          {(isImageUploading) ? 
+              <CircularProgress color="inherit" size="2.1875rem" />
+            : <ImageIcon fontSize="large"/>}
         </ToggleButton>
       </Box>
     </>
