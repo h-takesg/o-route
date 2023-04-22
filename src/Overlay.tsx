@@ -59,7 +59,10 @@ function Overlay({mode, imageUrlRef, setMode, clearAllLines, storageRoomRef}: Pr
           top: "0",
           margin: "1rem",
           display: "flex",
-          flexDirection: "column"
+          flexDirection: "column",
+          "@media screen and (max-width:600px)": {
+            margin: "0rem"
+          }
         }}
       >
         <ToggleButtonGroup
