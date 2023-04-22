@@ -41,7 +41,7 @@ function Overlay({mode, imageUrlRef, setMode, clearAllLines, storageRoomRef}: Pr
 
     const newRef = ref(storageRoomRef, Date.now().toString());
     setIsImageUploading(true);
-    await uploadBytes(newRef, event.target.files[0]);
+    await uploadBytes(newRef, event.target.files[0],{cacheControl: "private, max-age=86400"});
     setIsImageUploading(false);
     const newUrl = await getDownloadURL(newRef);
     set(imageUrlRef, newUrl);
