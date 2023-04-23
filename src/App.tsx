@@ -1,9 +1,9 @@
+import { Route, Routes } from 'react-router-dom';
 import Canvas from './Canvas'
 import { initializeApp} from "firebase/app";
+import { Home } from './Home';
 
 function App() {
-  const roomId = "hoge";
-  
   const firebaseConfig = {
     apiKey: "AIzaSyCs6u1FqePbYk1b5dx8NcICCH7Xc8zUjBg",
     authDomain: "o-route.firebaseapp.com",
@@ -18,7 +18,10 @@ function App() {
 
   return (
     <>
-      <Canvas roomId={roomId} firebaseApp={firebaseApp}/>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/rooms/:roomId" element={<Canvas firebaseApp={firebaseApp}/>} />
+      </Routes>
     </>
   )
 }

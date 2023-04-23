@@ -10,6 +10,7 @@ import { getStorage, ref } from "firebase/storage";
 import { FirebaseApp } from "firebase/app";
 import { useDatabaseRef } from "./hooks/useDatabaseRef";
 import { Overlay } from "./Overlay";
+import { useParams } from "react-router-dom";
 
 const MapImage = ({url}: {url:string}) => {
   const [image] = useImage(url)
@@ -17,11 +18,11 @@ const MapImage = ({url}: {url:string}) => {
 };
 
 type Props = {
-  roomId: string;
   firebaseApp: FirebaseApp;
 };
 
-function Canvas({roomId, firebaseApp}: Props) {
+function Canvas({firebaseApp}: Props) {
+  const { roomId } = useParams();
   const [width, height] = useWindowSize();
   const [imageUrl, setImageUrl] = useState<string>('');
   const [mode, setMode] = useState<Mode>("move");
