@@ -38,6 +38,7 @@ function Canvas({roomId, firebaseApp}: Props) {
   const eraseMousemoveBeforePositionOnGroup = useRef<Vector | null>(null);
   const dragVelocity = useRef(new Vector({x: 0, y: 0}));
   const dragMomentum = useRef<Konva.Tween | null>(null);
+  const SCROLL_PER_SCALE = 160;
   const SCALE_BY = 1.1;
   const ROTATE_BY = 0.02;
   const SCALE_MIN = 0.1;
@@ -314,7 +315,7 @@ function Canvas({roomId, firebaseApp}: Props) {
     if (event.evt.ctrlKey) {
       rotateAt(new Vector({x: width / 2, y: height / 2}), event.evt.deltaY * ROTATE_BY);
     } else {
-      const scale = event.evt.deltaY > 0 ? 1 / SCALE_BY : SCALE_BY;
+      const scale = SCALE_BY ** (-event.evt.deltaY / SCROLL_PER_SCALE);
       const pointerPositionOnStage = stage.getPointerPosition();
       scaleAt(new Vector(pointerPositionOnStage!), scale);
     }
