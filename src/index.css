@@ -6,6 +6,4 @@ body {
 body {
     /* 要素のスクロールを許さない */
     overflow: hidden;
-
-    background-color: #dddddd;
 }

@@ -47,6 +47,7 @@ function Canvas({firebaseApp}: Props) {
   const SCALE_MAX = 5;
   const BACKGROUND_SIZE = 80000;
   const BACKGROUND_OFFSET = BACKGROUND_SIZE * 2 / 5;
+  const BACKGROUND_COLOR = "#dddddd";
 
   // Canvasの座標で中心を指定しGroupをdegree回転させる
   const rotateAt = (centerOnStage: Vector, degree: number) => {
@@ -389,6 +390,7 @@ function Canvas({firebaseApp}: Props) {
               width={BACKGROUND_SIZE}
               offsetX={BACKGROUND_OFFSET}
               offsetY={BACKGROUND_OFFSET}
+              fill={BACKGROUND_COLOR}
             />
             <MapImage url={imageUrl} />
             {Object.entries(lines).map(([key,line]) => 
