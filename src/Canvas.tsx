@@ -10,7 +10,7 @@ import { getStorage, ref } from "firebase/storage";
 import { FirebaseApp } from "firebase/app";
 import { useDatabaseRef } from "./hooks/useDatabaseRef";
 import { Overlay } from "./Overlay";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 
 const MapImage = ({url}: {url:string}) => {
   const [image] = useImage(url)
@@ -23,6 +23,7 @@ type Props = {
 
 function Canvas({firebaseApp}: Props) {
   const { roomId } = useParams();
+  const navigate = useNavigate();
   const [width, height] = useWindowSize();
   const [imageUrl, setImageUrl] = useState<string>('');
   const [mode, setMode] = useState<Mode>("move");
@@ -321,12 +322,11 @@ function Canvas({firebaseApp}: Props) {
   }
 
   useEffect(() => {
-    if(typeof imageUrlRef !== "undefined") {
-      onValue(imageUrlRef, (snapshot) => {
-        if (snapshot.val() !== null) setImageUrl(snapshot.val());
-      });
-    }
-  });
+    return onValue(imageUrlRef, (snapshot) => {
+      if (snapshot.exists()) setImageUrl(snapshot.val());
+      else navigate("/errors/room_not_found");
+    });
+  }, []);
 
   const addNewPointFactory = (lineKey: string) => {
     return (snapshot: DataSnapshot) => {
@@ -342,31 +342,29 @@ function Canvas({firebaseApp}: Props) {
   }
 
   useEffect(() => {
-    if (typeof linesRef !== "undefined"){
-      onChildAdded(linesRef, (snapshot) => {
-        setLines(oldLines => ({...oldLines, [snapshot.key!]: snapshot.val()}));
+    onChildAdded(linesRef, (snapshot) => {
+      setLines(oldLines => ({...oldLines, [snapshot.key!]: snapshot.val()}));
 
-        // 自分以外の線なら以降の更新をlistenする
-        if (drawingLineRef.current?.key !== snapshot.key && snapshot.val().isDrawing) {
-          onChildAdded(child(linesRef, `${snapshot.key}/points`), addNewPointFactory(snapshot.key!));
-          onValue(child(linesRef, `${snapshot.key}/isDrawing`), (snapshotIsDrawing) => {
-            if (!snapshotIsDrawing.val()) {
-              off(child(linesRef, `${snapshot.key}/isDrawing`));
-              off(child(linesRef, `${snapshot.key}/points`));
-            }
-          })
-        }
-      });
-      onChildRemoved(linesRef, (snapshot) => {
-        setLines(oldLines => {
-          const temp = {...oldLines};
-          delete temp[snapshot.key!];
-          return temp;
+      // 自分以外の線でかつ描き込み中なら以降の更新をlistenする
+      if (drawingLineRef.current?.key !== snapshot.key && snapshot.val().isDrawing) {
+        onChildAdded(child(linesRef, `${snapshot.key}/points`), addNewPointFactory(snapshot.key!));
+        onValue(child(linesRef, `${snapshot.key}/isDrawing`), (snapshotIsDrawing) => {
+          if (!snapshotIsDrawing.val()) {
+            off(child(linesRef, `${snapshot.key}/isDrawing`));
+            off(child(linesRef, `${snapshot.key}/points`));
+          }
         })
-      });
-      return () => off(linesRef);
-    }
-  }, [linesRef]);
+      }
+    });
+    onChildRemoved(linesRef, (snapshot) => {
+      setLines(oldLines => {
+        const temp = {...oldLines};
+        delete temp[snapshot.key!];
+        return temp;
+      })
+    });
+    return () => off(linesRef);
+  }, []);
 
   return (
     <>

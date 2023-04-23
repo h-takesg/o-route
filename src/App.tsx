@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import Canvas from './Canvas'
 import { initializeApp} from "firebase/app";
 import { Home } from './Home';
+import { RoomNotFound } from './RoomNotFound';
 
 function App() {
   const firebaseConfig = {
@@ -21,6 +22,7 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/rooms/:roomId" element={<Canvas firebaseApp={firebaseApp}/>} />
+        <Route path="/errors/room_not_found" element={<RoomNotFound />} />
       </Routes>
     </>
   )
