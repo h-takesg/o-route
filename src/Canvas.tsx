@@ -1,25 +1,25 @@
-import Konva from "konva"
-import { useEffect, useRef, useState } from "react"
-import { Layer, Stage, Image, Group, Line, Rect } from "react-konva"
-import useImage from "use-image"
-import { useWindowSize } from "./hooks/useWindwosSize"
-import { DrawLine, Lines, Mode } from "./types"
-import { Point, Vector, clamp, closestToZero, intersectsLineSegment } from "./math"
+import Konva from "konva";
+import { useEffect, useRef, useState } from "react";
+import { Layer, Stage, Image, Group, Line, Rect } from "react-konva";
+import useImage from "use-image";
+import { useWindowSize } from "./hooks/useWindwosSize";
+import { DrawLine, Lines, Mode } from "./types";
+import { Point, Vector, clamp, closestToZero, intersectsLineSegment } from "./math";
 import { DataSnapshot, DatabaseReference, child, off, onChildAdded, onChildRemoved, onValue, push, remove, set, update } from "firebase/database";
 import { getStorage, ref } from "firebase/storage";
-import { FirebaseApp } from "firebase/app"
-import { useDatabaseRef } from "./hooks/useDatabaseRef"
-import { Overlay } from "./Overlay"
+import { FirebaseApp } from "firebase/app";
+import { useDatabaseRef } from "./hooks/useDatabaseRef";
+import { Overlay } from "./Overlay";
 
 const MapImage = ({url}: {url:string}) => {
   const [image] = useImage(url)
   return <Image image={image} />
-}
+};
 
 type Props = {
   roomId: string;
   firebaseApp: FirebaseApp;
-}
+};
 
 function Canvas({roomId, firebaseApp}: Props) {
   const [width, height] = useWindowSize();
@@ -119,7 +119,7 @@ function Canvas({roomId, firebaseApp}: Props) {
     const pointerOnStage = new Vector({
       x: (event.evt instanceof MouseEvent) ? event.evt.pageX: event.evt.touches[0].pageX,
       y: (event.evt instanceof MouseEvent) ? event.evt.pageY: event.evt.touches[0].pageY,
-    })
+    });
     const pointerOnGroup = new Vector(group.getRelativePointerPosition());
     
     switch(mode){
