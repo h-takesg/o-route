@@ -280,21 +280,19 @@ function Canvas({roomId, firebaseApp}: Props) {
     const group = groupRef.current;
       if (group === null) return;
 
-      const FLICTION = 10; // 時間的止まりやすさ
-      const WEIGHT = 500; // 慣性の強さ
-      const signAX = Math.sign(dragVelocity.current.x);
-      const signAY = Math.sign(dragVelocity.current.y);
+      const FLICTION = 4.15; // 時間的止まりやすさ
+      const WEIGHT = 60; // 慣性の強さ
       const dragSpeed = Math.sqrt(dragVelocity.current.getSize()); // 速さ
       const stoppingDuration = Math.sqrt(dragSpeed) / FLICTION; // 停止までの時間
-      const stoppingDistanceX = (Math.sqrt(Math.abs(dragVelocity.current.x)/100) * WEIGHT) * signAX;
-      const stoppingDistanceY = (Math.sqrt(Math.abs(dragVelocity.current.y)/100) * WEIGHT) * signAY;  
+      const stoppingDistance = Math.sqrt(dragSpeed) * WEIGHT;
+      const stoppingMovement = dragVelocity.current.getScaled(stoppingDistance / dragSpeed);
 
-      if (dragSpeed > 5) {
+      if (dragSpeed > 2.5) {
         dragMomentum.current =  new Konva.Tween({
           node: group,
           duration: stoppingDuration,
-          x: group.x() + (stoppingDistanceX || 0),
-          y: group.y() + (stoppingDistanceY || 0),
+          x: group.x() + stoppingMovement.x,
+          y: group.y() + stoppingMovement.y,
           easing: Konva.Easings.EaseOut,
         }).play();
       }
