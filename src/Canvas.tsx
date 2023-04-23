@@ -4,7 +4,7 @@ import { Layer, Stage, Image, Group, Line, Rect } from "react-konva"
 import useImage from "use-image"
 import { useWindowSize } from "./hooks/useWindwosSize"
 import { DrawLine, Lines, Mode } from "./types"
-import { Point, intersectsLineSegment, rotateVector } from "./math"
+import { Point, Vector, clamp, closestToZero, intersectsLineSegment } from "./math"
 import { DataSnapshot, DatabaseReference, child, off, onChildAdded, onChildRemoved, onValue, push, remove, set, update } from "firebase/database";
 import { getStorage, ref } from "firebase/storage";
 import { FirebaseApp } from "firebase/app"
@@ -23,20 +23,20 @@ type Props = {
 
 function Canvas({roomId, firebaseApp}: Props) {
   const [width, height] = useWindowSize();
-  const [imageUrl, setImageUrl] = useState<string>('./samplemap.jpg');
+  const [imageUrl, setImageUrl] = useState<string>('');
   const [mode, setMode] = useState<Mode>("move");
   const [lines, setLines] = useState<Lines>({});
-  const stageRef = useRef<Konva.Stage>(null)
-  const groupRef = useRef<Konva.Group>(null)
+  const stageRef = useRef<Konva.Stage>(null);
+  const groupRef = useRef<Konva.Group>(null);
   const drawingLineRef = useRef<DatabaseReference | null>(null);
   const linesRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/lines`);
   const imageUrlRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/image`);
   const storageRoomRef = useRef(ref(getStorage(firebaseApp), roomId));
-  const pointermoveBeforePositionOnStage = useRef<{x:number, y: number} | null>(null);
+  const pointerBeforeOnStage = useRef<Vector | null>(null);
   const beforePointersDistance = useRef<number | null>(null);
   const beforePointersRotation = useRef<number | null>(null);
-  const eraseMousemoveBeforePositionOnGroup = useRef<{x:number, y: number} | null>(null);
-  const dragVelocity = useRef({x: 0, y: 0});
+  const eraseMousemoveBeforePositionOnGroup = useRef<Vector | null>(null);
+  const dragVelocity = useRef(new Vector({x: 0, y: 0}));
   const dragMomentum = useRef<Konva.Tween | null>(null);
   const SCALE_BY = 1.1;
   const ROTATE_BY = 0.02;
@@ -46,7 +46,7 @@ function Canvas({roomId, firebaseApp}: Props) {
   const BACKGROUND_OFFSET = BACKGROUND_SIZE * 2 / 5;
 
   // Canvasの座標で中心を指定しGroupをdegree回転させる
-  const rotateAt = (x: number, y: number, degree: number) => {
+  const rotateAt = (centerOnStage: Vector, degree: number) => {
     const group = groupRef.current;
     if (group === null) return;   
 
@@ -59,39 +59,29 @@ function Canvas({roomId, firebaseApp}: Props) {
     // snappingDegreeごとにスナップを付ける
     const snappedDegree = (Math.abs(delta) < 1) ? degree - delta : degree;
 
-    const oldCenterToGroup = {
-      x: group.x() - x,
-      y: group.y() - y
-    }
-    const newCenterToGroup = rotateVector(oldCenterToGroup.x, oldCenterToGroup.y, snappedDegree);
+    const groupPositionOnStage = new Vector(group.position());
+    const oldCenterToGroup = groupPositionOnStage.getSub(centerOnStage);
+    const newCenterToGroup = oldCenterToGroup.getRotated(snappedDegree);
+    const newPosition = centerOnStage.getAdd(newCenterToGroup);
 
-    const newPosition = {
-      x: x + newCenterToGroup.x,
-      y: y + newCenterToGroup.y
-    } 
     group.position(newPosition);
     group.rotation((group.rotation() + snappedDegree)%360);
   }
 
   // Canvasの座標で中心を指定しGroupをscale倍する
-  const scaleAt = (x: number, y: number, scale: number) => {
+  const scaleAt = (centerOnStage: Vector, scale: number) => {
     const stage = stageRef.current;
     const group = groupRef.current;
     if (stage === null || group === null) return;
 
-    const oldScale = group.scaleX()
-    const pointerOnStage = {x, y};
-    const pointerOnGroupNoRotation = {
-      x: (pointerOnStage.x - group.x()) / oldScale,
-      y: (pointerOnStage.y - group.y()) / oldScale
-    };
-    const newScale = Math.max(SCALE_MIN, Math.min(oldScale * scale, SCALE_MAX));
+    const oldScale = group.scaleX();
+    const oldGroupOnStage = new Vector(group.position());
+    const centerOnGroupNoRotation = centerOnStage.getSub(oldGroupOnStage).getScaled(1 / oldScale);
+    const newScale = clamp(SCALE_MIN, oldScale * scale, SCALE_MAX);
+    const newGroupOnStage = centerOnStage.getAdd(centerOnGroupNoRotation.getScaled(newScale).getReverse());
+
     group.scale({ x: newScale, y: newScale});
-    const newPos = {
-      x: pointerOnStage.x - pointerOnGroupNoRotation.x * newScale,
-      y: pointerOnStage.y - pointerOnGroupNoRotation.y * newScale,
-    }
-    group.position(newPos);
+    group.position(newGroupOnStage);
   }
 
   const clearAllLines = () => {
@@ -101,7 +91,7 @@ function Canvas({roomId, firebaseApp}: Props) {
   const handleMouseDown = (event: Konva.KonvaEventObject<PointerEvent>) => {
     if (mode !== "move") return;
 
-    pointermoveBeforePositionOnStage.current = null;
+    pointerBeforeOnStage.current = null;
     beforePointersDistance.current = null;
     beforePointersRotation.current = null;
     
@@ -115,7 +105,6 @@ function Canvas({roomId, firebaseApp}: Props) {
     if (event.evt.touches.length >= 2) {
       handleTwoPointerMove(event);
     } else {
-      console.log("single");
       handleOnePointerMove(event);
     }
   }
@@ -126,31 +115,22 @@ function Canvas({roomId, firebaseApp}: Props) {
     const group = groupRef.current;
     if (group === null) return;
 
-    const pointerOnGroup = group.getRelativePointerPosition();
+    const pointerOnStage = new Vector({
+      x: (event.evt instanceof MouseEvent) ? event.evt.pageX: event.evt.touches[0].pageX,
+      y: (event.evt instanceof MouseEvent) ? event.evt.pageY: event.evt.touches[0].pageY,
+    })
+    const pointerOnGroup = new Vector(group.getRelativePointerPosition());
     
     switch(mode){
       case "move":
-        const pointerX = (event.evt instanceof MouseEvent) ? 
-          event.evt.pageX : event.evt.touches[0].pageX;
-        const pointerY = (event.evt instanceof MouseEvent) ?
-          event.evt.pageY : event.evt.touches[0].pageY;
-        if (pointermoveBeforePositionOnStage.current !== null) {
-          const movementX = pointerX - pointermoveBeforePositionOnStage.current.x;
-          const movementY = pointerY - pointermoveBeforePositionOnStage.current.y;
-  
-          group.position({
-            x: group.x() + movementX,
-            y: group.y() + movementY
-          });
-          
-          dragVelocity.current = {x: movementX, y: movementY};
+        if (pointerBeforeOnStage.current !== null) {
+          const movement = pointerOnStage.getSub(pointerBeforeOnStage.current);
+          group.position(movement.getAdd(group.position()));
+          dragVelocity.current = movement;
         }
-
-        pointermoveBeforePositionOnStage.current = {
-          x: pointerX,
-          y: pointerY
-        };
+        pointerBeforeOnStage.current = pointerOnStage;
         break;
+
       case "draw":
         if (typeof linesRef === "undefined") return;
     
@@ -182,31 +162,28 @@ function Canvas({roomId, firebaseApp}: Props) {
           });
           
           // for local
-          const newLine = {...oldLine};
-          newLine.points = [...oldLine.points, pointerOnGroup.x, pointerOnGroup.y];
+          const newLine = {
+            ...oldLine,
+            points: [...oldLine.points, pointerOnGroup.x, pointerOnGroup.y]
+          };
           setLines({
             ...lines,
             [drawingLineRef.current.key!]: newLine
           });
         }
         break;
+
       case "erase":
         if (eraseMousemoveBeforePositionOnGroup.current !== null) {
-          const beforePoint: Point = [
-            eraseMousemoveBeforePositionOnGroup.current.x,
-            eraseMousemoveBeforePositionOnGroup.current.y
-          ];
-          const pointerPoint: Point = [
-            pointerOnGroup.x,
-            pointerOnGroup.y
-          ];
+          const beforePoint: Point = eraseMousemoveBeforePositionOnGroup.current;
+          const pointerPoint: Point = pointerOnGroup;
           
           const toBeRemoved: string[] = [];
           
           for (const key in lines) {
             const line = lines[key];
             for (let i = 0; i < line.points.length/2 - 1; i++) {
-              if (intersectsLineSegment([beforePoint, pointerPoint], [[line.points[i*2], line.points[i*2+1]], [line.points[i*2+2], line.points[i*2+3]]])) {
+              if (intersectsLineSegment([beforePoint, pointerPoint], [{x: line.points[i*2], y: line.points[i*2+1]}, {x: line.points[i*2+2], y: line.points[i*2+3]}])) {
                 toBeRemoved.push(key);
                 break;
               }
@@ -226,59 +203,42 @@ function Canvas({roomId, firebaseApp}: Props) {
     const group = groupRef.current;
     if (group === null) return;
 
-    const pointer0Position = {
+    const pointer0 = new Vector({
       x: event.evt.touches[0].pageX,
       y: event.evt.touches[0].pageY
-    };
-    const pointer1Position = {
+    });
+    const pointer1 = new Vector({
       x: event.evt.touches[1].pageX,
       y: event.evt.touches[1].pageY
-    };
-    const midpointPosition = {
-      x: (pointer0Position.x + pointer1Position.x) / 2,
-      y: (pointer0Position.y + pointer1Position.y) / 2,
-    }
-    const pointersDistance = Math.max(1, Math.sqrt(
-      (pointer1Position.x - pointer0Position.x) ** 2
-      + (pointer1Position.y - pointer0Position.y) ** 2
-    ));
-    const pointersRotation = Math.atan(
-      (pointer1Position.y - pointer0Position.y)
-      / (pointer1Position.x - pointer0Position.x)
-    ) * 180 / Math.PI + 360;
+    });
+    const pointer0ToPointer1 = pointer1.getSub(pointer0);
+    const midpoint = pointer0.getAdd(pointer0ToPointer1.getScaled(1/2));
+    const pointersDistance = Math.max(1, pointer0ToPointer1.getSize());
+    const pointersRotation = pointer0ToPointer1.getRotationDegree();   
 
     // position
-    if (pointermoveBeforePositionOnStage.current !== null) {
-      const movementX = midpointPosition.x - pointermoveBeforePositionOnStage.current.x;
-      const movementY = midpointPosition.y - pointermoveBeforePositionOnStage.current.y;
-
-      group.position({
-        x: group.x() + movementX,
-        y: group.y() + movementY
-      });
-      dragVelocity.current = {x: movementX, y: movementY};
+    if (pointerBeforeOnStage.current !== null) {
+      const movement = midpoint.getSub(pointerBeforeOnStage.current);
+      group.position(movement.getAdd(group.position()));
+      dragVelocity.current = movement;
     }
-    pointermoveBeforePositionOnStage.current = midpointPosition;
+    pointerBeforeOnStage.current = midpoint;
 
-    // scale
-    console.log("scale");
-    console.log(beforePointersDistance.current);
-    console.log(pointersDistance);
-    
+    // scale    
     if (beforePointersDistance.current !== null) {
       const scale = pointersDistance / beforePointersDistance.current;
-      scaleAt(midpointPosition.x, midpointPosition.y, scale);
+      scaleAt(new Vector(midpoint), scale);
     }
     beforePointersDistance.current = pointersDistance;
 
     // rotation
     if (beforePointersRotation.current !== null) {
-      const rotation = [
+      const rotation = closestToZero(
         pointersRotation - beforePointersRotation.current,
-        pointersRotation - beforePointersRotation.current + 180,
-        pointersRotation - beforePointersRotation.current - 180
-      ].sort((a, b) => Math.abs(a) - Math.abs(b))[0];
-      rotateAt(midpointPosition.x, midpointPosition.y, rotation);
+        pointersRotation - beforePointersRotation.current + 360,
+        pointersRotation - beforePointersRotation.current - 360
+      );
+      rotateAt(new Vector(midpoint), rotation);
     }
     beforePointersRotation.current = pointersRotation;
   }
@@ -286,7 +246,7 @@ function Canvas({roomId, firebaseApp}: Props) {
   const handleMouseUp = (event: Konva.KonvaEventObject<MouseEvent>) => {
     if (event.evt.buttons !== 0) return;
 
-    pointermoveBeforePositionOnStage.current = null;
+    pointerBeforeOnStage.current = null;
     
     if(mode === "draw") {
       set(child(drawingLineRef.current!, "isDrawing"), false);
@@ -299,7 +259,7 @@ function Canvas({roomId, firebaseApp}: Props) {
   }
 
   const handleTouchEnd = (event: Konva.KonvaEventObject<TouchEvent>) => {
-    pointermoveBeforePositionOnStage.current = null;
+    pointerBeforeOnStage.current = null;
     beforePointersDistance.current = null;
     beforePointersRotation.current = null;
 
@@ -323,7 +283,7 @@ function Canvas({roomId, firebaseApp}: Props) {
       const WEIGHT = 500; // 慣性の強さ
       const signAX = Math.sign(dragVelocity.current.x);
       const signAY = Math.sign(dragVelocity.current.y);
-      const dragSpeed = Math.sqrt(dragVelocity.current.x ** 2 + dragVelocity.current.y ** 2); // 速さ
+      const dragSpeed = Math.sqrt(dragVelocity.current.getSize()); // 速さ
       const stoppingDuration = Math.sqrt(dragSpeed) / FLICTION; // 停止までの時間
       const stoppingDistanceX = (Math.sqrt(Math.abs(dragVelocity.current.x)/100) * WEIGHT) * signAX;
       const stoppingDistanceY = (Math.sqrt(Math.abs(dragVelocity.current.y)/100) * WEIGHT) * signAY;  
@@ -338,7 +298,7 @@ function Canvas({roomId, firebaseApp}: Props) {
         }).play();
       }
       
-      dragVelocity.current = {x: 0, y: 0};
+      dragVelocity.current = new Vector({x: 0, y: 0});
   }
 
   const handleWheel = (event: Konva.KonvaEventObject<WheelEvent>) => {
@@ -352,11 +312,11 @@ function Canvas({roomId, firebaseApp}: Props) {
     dragMomentum.current?.destroy();
 
     if (event.evt.ctrlKey) {
-      rotateAt(width / 2, height / 2, event.evt.deltaY * ROTATE_BY);
+      rotateAt(new Vector({x: width / 2, y: height / 2}), event.evt.deltaY * ROTATE_BY);
     } else {
       const scale = event.evt.deltaY > 0 ? 1 / SCALE_BY : SCALE_BY;
       const pointerPositionOnStage = stage.getPointerPosition();
-      scaleAt(pointerPositionOnStage!.x, pointerPositionOnStage!.y, scale);
+      scaleAt(new Vector(pointerPositionOnStage!), scale);
     }
   }
 
@@ -414,12 +374,12 @@ function Canvas({roomId, firebaseApp}: Props) {
         height={height}
         width={width}
         ref={stageRef}
-        onWheel={handleWheel}
-      >
+        >
         <Layer>
           <Group
             ref={groupRef}
             draggable={false}
+            onWheel={handleWheel}
             onPointerDown={handleMouseDown}
             onMouseMove={handleOnePointerMove}
             onTouchMove={handleTouchmove}
