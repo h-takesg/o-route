@@ -22,7 +22,6 @@ function OnlineCanvas({firebaseApp}: Props) {
   const storageRoomRef = useRef(ref(getStorage(firebaseApp), roomId));
   const [lines, setLines] = useState<Lines>({});
 
-  
   const setImage = async (image: File) => {
     const newRef = ref(storageRoomRef.current, Date.now().toString());
     await uploadBytes(newRef, image,{cacheControl: "private, max-age=86400"});
