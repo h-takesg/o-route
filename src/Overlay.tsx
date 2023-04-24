@@ -6,18 +6,15 @@ import ClearIcon from '@mui/icons-material/Clear';
 import ImageIcon from '@mui/icons-material/Image';
 import {FaEraser} from 'react-icons/fa';
 import { Mode } from "./types";
-import { StorageReference, getDownloadURL, ref, uploadBytes } from "firebase/storage";
-import { DatabaseReference, set } from "firebase/database";
 
 type Props = {
   mode: Mode;
-  imageUrlRef: DatabaseReference;
   setMode: Dispatch<SetStateAction<Mode>>;
+  setImage: (image: File) => Promise<void>;
   clearAllLines: () => void;
-  storageRoomRef: StorageReference;
 }
 
-function Overlay({mode, imageUrlRef, setMode, clearAllLines, storageRoomRef}: Props) {
+function Overlay({mode, setMode, setImage, clearAllLines}: Props) {
   const imageSelectButtonRef = useRef<HTMLInputElement>(null);
   const [isImageUploading, setIsImageUploading] = useState(false);
 
@@ -39,12 +36,9 @@ function Overlay({mode, imageUrlRef, setMode, clearAllLines, storageRoomRef}: Pr
     const ACCEPT_FILETYPE_REGEX = /^image\/.*/;
     if (!ACCEPT_FILETYPE_REGEX.test(selectedFile.type)) return;
 
-    const newRef = ref(storageRoomRef, Date.now().toString());
     setIsImageUploading(true);
-    await uploadBytes(newRef, event.target.files[0],{cacheControl: "private, max-age=86400"});
+    await setImage(event.target.files[0]);
     setIsImageUploading(false);
-    const newUrl = await getDownloadURL(newRef);
-    set(imageUrlRef, newUrl);
   }
 
   const handleImageSelectButton = () => {

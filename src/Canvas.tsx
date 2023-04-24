@@ -1,16 +1,11 @@
 import Konva from "konva";
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Layer, Stage, Image, Group, Line, Rect } from "react-konva";
 import useImage from "use-image";
 import { useWindowSize } from "./hooks/useWindwosSize";
-import { DrawLine, Lines, Mode } from "./types";
+import { Lines, Mode } from "./types";
 import { Point, Vector, clamp, closestToZero, intersectsLineSegment } from "./math";
-import { DataSnapshot, DatabaseReference, child, off, onChildAdded, onChildRemoved, onValue, push, remove, set, update } from "firebase/database";
-import { getStorage, ref } from "firebase/storage";
-import { FirebaseApp } from "firebase/app";
-import { useDatabaseRef } from "./hooks/useDatabaseRef";
 import { Overlay } from "./Overlay";
-import { useNavigate, useParams } from "react-router-dom";
 
 const MapImage = ({url}: {url:string}) => {
   const [image] = useImage(url)
@@ -18,22 +13,28 @@ const MapImage = ({url}: {url:string}) => {
 };
 
 type Props = {
-  firebaseApp: FirebaseApp;
+  imageUrl: string;
+  setImage: (image: File) => Promise<void>;
+  lines: Lines;
+  addPointToDrawingLine: ({x, y}: Point) => void;
+  endDrawing: () => void;
+  removeLines: (ids: string[]) => void;
+  clearAllLines: () => void;
 };
 
-function Canvas({firebaseApp}: Props) {
-  const { roomId } = useParams();
-  const navigate = useNavigate();
+function Canvas({
+  imageUrl,
+  setImage,
+  lines,
+  addPointToDrawingLine,
+  endDrawing,
+  removeLines,
+  clearAllLines
+}: Props) {
   const [width, height] = useWindowSize();
-  const [imageUrl, setImageUrl] = useState<string>('');
   const [mode, setMode] = useState<Mode>("move");
-  const [lines, setLines] = useState<Lines>({});
   const stageRef = useRef<Konva.Stage>(null);
   const groupRef = useRef<Konva.Group>(null);
-  const drawingLineRef = useRef<DatabaseReference | null>(null);
-  const linesRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/lines`);
-  const imageUrlRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/image`);
-  const storageRoomRef = useRef(ref(getStorage(firebaseApp), roomId));
   const pointerBeforeOnStage = useRef<Vector | null>(null);
   const beforePointersDistance = useRef<number | null>(null);
   const beforePointersRotation = useRef<number | null>(null);
@@ -87,10 +88,6 @@ function Canvas({firebaseApp}: Props) {
     group.scale({ x: newScale, y: newScale});
     group.position(newGroupOnStage);
   }
-
-  const clearAllLines = () => {
-    remove(linesRef!);
-  }
   
   const handleMouseDown = (event: Konva.KonvaEventObject<PointerEvent>) => {
     if (mode !== "move") return;
@@ -136,45 +133,7 @@ function Canvas({firebaseApp}: Props) {
         break;
 
       case "draw":
-        if (typeof linesRef === "undefined") return;
-    
-        if (drawingLineRef.current === null) {
-          const newLine: DrawLine = {
-            isDrawing: true,
-            timestamp: Date.now().toString(),
-            points: [pointerOnGroup.x, pointerOnGroup.y],
-            compositionMode: "source-over"
-          }
-          drawingLineRef.current = push(linesRef);
-    
-          // for upload
-          set(drawingLineRef.current, newLine);
-    
-          // for local
-          setLines({
-            ...lines,
-            [drawingLineRef.current.key!]: newLine
-          });
-        } else {
-          const oldLine = lines[drawingLineRef.current.key!];
-          const oldLength = oldLine.points.length;
-          
-          // for upload
-          update(child(drawingLineRef.current, "points"),{
-            [oldLength]: pointerOnGroup.x,
-            [oldLength + 1]: pointerOnGroup.y
-          });
-          
-          // for local
-          const newLine = {
-            ...oldLine,
-            points: [...oldLine.points, pointerOnGroup.x, pointerOnGroup.y]
-          };
-          setLines({
-            ...lines,
-            [drawingLineRef.current.key!]: newLine
-          });
-        }
+        addPointToDrawingLine({x: pointerOnGroup.x, y: pointerOnGroup.y});
         break;
 
       case "erase":
@@ -194,7 +153,7 @@ function Canvas({firebaseApp}: Props) {
             }
           }
           
-          toBeRemoved.forEach(id => remove(child(linesRef!, id)));
+          removeLines(toBeRemoved);
         }
         eraseMousemoveBeforePositionOnGroup.current = pointerOnGroup;
         break;
@@ -253,8 +212,7 @@ function Canvas({firebaseApp}: Props) {
     pointerBeforeOnStage.current = null;
     
     if(mode === "draw") {
-      set(child(drawingLineRef.current!, "isDrawing"), false);
-      drawingLineRef.current = null;
+      endDrawing();
     } else if (mode === "erase") {
       eraseMousemoveBeforePositionOnGroup.current = null;
     } else if (mode === "move") {
@@ -268,8 +226,7 @@ function Canvas({firebaseApp}: Props) {
     beforePointersRotation.current = null;
 
     if(mode === "draw") {
-      set(child(drawingLineRef.current!, "isDrawing"), false);
-      drawingLineRef.current = null;
+      endDrawing();
     } else if (mode === "erase") {
       eraseMousemoveBeforePositionOnGroup.current = null;
     } else if (mode === "move") {
@@ -322,51 +279,6 @@ function Canvas({firebaseApp}: Props) {
     }
   }
 
-  useEffect(() => {
-    return onValue(imageUrlRef, (snapshot) => {
-      if (snapshot.exists()) setImageUrl(snapshot.val());
-      else navigate("/errors/room_not_found");
-    });
-  }, []);
-
-  const addNewPointFactory = (lineKey: string) => {
-    return (snapshot: DataSnapshot) => {
-      setLines(oldLines => {
-        const targetLine = {...oldLines[lineKey]};
-        targetLine.points = [...targetLine.points, snapshot.val()];
-        return {
-          ...oldLines,
-          [lineKey]: targetLine
-        }
-      });
-    }
-  }
-
-  useEffect(() => {
-    onChildAdded(linesRef, (snapshot) => {
-      setLines(oldLines => ({...oldLines, [snapshot.key!]: snapshot.val()}));
-
-      // 自分以外の線でかつ描き込み中なら以降の更新をlistenする
-      if (drawingLineRef.current?.key !== snapshot.key && snapshot.val().isDrawing) {
-        onChildAdded(child(linesRef, `${snapshot.key}/points`), addNewPointFactory(snapshot.key!));
-        onValue(child(linesRef, `${snapshot.key}/isDrawing`), (snapshotIsDrawing) => {
-          if (!snapshotIsDrawing.val()) {
-            off(child(linesRef, `${snapshot.key}/isDrawing`));
-            off(child(linesRef, `${snapshot.key}/points`));
-          }
-        })
-      }
-    });
-    onChildRemoved(linesRef, (snapshot) => {
-      setLines(oldLines => {
-        const temp = {...oldLines};
-        delete temp[snapshot.key!];
-        return temp;
-      })
-    });
-    return () => off(linesRef);
-  }, []);
-
   return (
     <>
       <Stage
@@ -408,10 +320,9 @@ function Canvas({firebaseApp}: Props) {
       </Stage>
       <Overlay 
         mode={mode}
-        imageUrlRef={imageUrlRef!}
         setMode={setMode}
+        setImage={setImage}
         clearAllLines={clearAllLines}
-        storageRoomRef={storageRoomRef.current}
        />
     </>
   )
