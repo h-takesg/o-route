@@ -4,6 +4,5 @@ body {
 }
 
 body {
-    /* 要素のスクロールを許さない */
-    overflow: hidden;
+    font-family: sans-serif;
 }
