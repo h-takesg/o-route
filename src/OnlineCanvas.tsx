@@ -1,5 +1,5 @@
 import { FirebaseApp } from "firebase/app";
-import Canvas from "./Canvas";
+import { Canvas } from "./Canvas";
 import { useEffect, useRef, useState } from "react";
 import { DataSnapshot, DatabaseReference, child, off, onChildAdded, onChildRemoved, onValue, push, remove, set, update } from "firebase/database";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
@@ -28,7 +28,7 @@ function OnlineCanvas({firebaseApp}: Props) {
       .catch(() => alert("アップロードに失敗しました．ネットワーク不調もしくはファイルが大きすぎるかもしれません．20MB未満のファイルを使用してください．"));
     
     if (typeof result === "undefined") return;
-    
+
     const newUrl = await getDownloadURL(newRef);
     set(imageUrlRef, newUrl);
   }

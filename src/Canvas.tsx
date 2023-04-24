@@ -328,4 +328,4 @@ function Canvas({
   )
 }
 
-export default Canvas
+export { Canvas };

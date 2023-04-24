@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import Canvas from "./Canvas";
+import { Canvas } from "./Canvas";
 import { Point } from "./math";
 import { Lines, DrawLine } from "./types";
 
