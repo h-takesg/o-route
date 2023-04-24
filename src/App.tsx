@@ -20,7 +20,7 @@ function App() {
   return (
     <>
       <Routes>
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<Home firebaseApp={firebaseApp} />} />
         <Route path="/rooms/:roomId" element={<Canvas firebaseApp={firebaseApp}/>} />
         <Route path="/errors/room_not_found" element={<RoomNotFound />} />
       </Routes>
