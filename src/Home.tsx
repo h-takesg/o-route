@@ -38,7 +38,7 @@ function Home({firebaseApp}: {firebaseApp: FirebaseApp}) {
       }}>
         <Card
           sx={{
-            width: "40%",
+            width: "45%",
             margin: "1rem auto"
           }}
           elevation={4}
@@ -60,7 +60,7 @@ function Home({firebaseApp}: {firebaseApp: FirebaseApp}) {
         </Card>
         <Card
           sx={{
-            width: "40%",
+            width: "45%",
             margin: "1rem auto"
           }}
           elevation={4}
@@ -85,7 +85,7 @@ function Home({firebaseApp}: {firebaseApp: FirebaseApp}) {
         <h2>これは？</h2>
         <p>
           地図読みでの利用を目的としたオンラインホワイトボードです．
-          画像読み込み，拡大，縮小に加えて回転にも対応しています．
+          画像読み込み，拡大，縮小に加えて1度刻みでの回転にも対応しています．
         </p>
         <p>
           オンラインモードで開始し，遷移後のURLを共有すると他の人といっしょに使えます．
@@ -108,7 +108,8 @@ function Home({firebaseApp}: {firebaseApp: FirebaseApp}) {
         <h3>移動モード</h3>
         <p>
           基本的に地図アプリと同じ操作感です．
-          スワイプで移動，スクロールで拡大縮小，Ctrlキーを押しながらスクロールで回転です．
+          スワイプで移動，2本指で拡大縮小回転です．
+          PCならスクロールで拡大縮小，Ctrlキーを押しながらスクロールで回転です．
         </p>
         <h3>ペンモード</h3>
         <p>
@@ -133,6 +134,12 @@ function Home({firebaseApp}: {firebaseApp: FirebaseApp}) {
           最大20MBまでです．
           画像ファイルのみ受け付けます．
           PDFは読み込めません．
+        </p>
+        <h2>注意</h2>
+        <p>
+          無保障です．
+          勝手にデータやルームが消えることもあれば規定の時間を超えて残ることもありえます．
+          機微なデータは入れないでください．
         </p>
         <h2>つくったひと</h2>
         <Link href="https://twitter.com/tooktwi" underline="hover">@tooktwi</Link> <br />
