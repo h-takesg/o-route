@@ -73,7 +73,7 @@ function Home({firebaseApp}: {firebaseApp: FirebaseApp}) {
             <Typography variant="body2">
               <p>みんなで使う</p>
               <p>サーバー上に保存</p>
-              <p><s>24時間有効</s> <wbr />閉鎖未実装</p>
+              <p>24時間有効</p>
             </Typography>
             <Typography align="center" color="primary">
               ENTER
