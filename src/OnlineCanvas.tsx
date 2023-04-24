@@ -24,7 +24,11 @@ function OnlineCanvas({firebaseApp}: Props) {
 
   const setImage = async (image: File) => {
     const newRef = ref(storageRoomRef.current, Date.now().toString());
-    await uploadBytes(newRef, image,{cacheControl: "private, max-age=86400"});
+    const result = await uploadBytes(newRef, image,{cacheControl: "private, max-age=86400"})
+      .catch(() => alert("アップロードに失敗しました．ネットワーク不調もしくはファイルが大きすぎるかもしれません．20MB未満のファイルを使用してください．"));
+    
+    if (typeof result === "undefined") return;
+    
     const newUrl = await getDownloadURL(newRef);
     set(imageUrlRef, newUrl);
   }
