@@ -2,9 +2,9 @@ import Konva from "konva";
 import { useEffect, useRef, useState } from "react";
 import { Layer, Stage, Image, Group, Line, Rect } from "react-konva";
 import useImage from "use-image";
-import { useWindowSize } from "./hooks/useWindwosSize";
-import { Lines, Mode } from "./types";
-import { Point, Vector, clamp, closestToZero, intersectsLineSegment } from "./math";
+import { useWindowSize } from "../hooks/useWindwosSize";
+import { Lines, Mode } from "../types";
+import { Point, Vector, clamp, closestToZero, intersectsLineSegment } from "../math";
 import { Overlay } from "./Overlay";
 
 const MapImage = ({url}: {url:string}) => {

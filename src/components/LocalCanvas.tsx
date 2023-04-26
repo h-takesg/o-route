@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Canvas } from "./Canvas";
-import { Point } from "./math";
-import { Lines, DrawLine } from "./types";
+import { Point } from "../math";
+import { Lines, DrawLine } from "../types";
 
 function LocalCanvas() {
   const [imageUrl, setImageUrl] = useState<string>('');

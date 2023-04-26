@@ -5,7 +5,7 @@ import ModeIcon from '@mui/icons-material/Mode';
 import ClearIcon from '@mui/icons-material/Clear';
 import ImageIcon from '@mui/icons-material/Image';
 import {FaEraser} from 'react-icons/fa';
-import { Mode } from "./types";
+import { Mode } from "../types";
 
 type Props = {
   mode: Mode;

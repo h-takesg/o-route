@@ -3,10 +3,10 @@ import { Canvas } from "./Canvas";
 import { useEffect, useRef, useState } from "react";
 import { DataSnapshot, DatabaseReference, child, off, onChildAdded, onChildRemoved, onValue, push, remove, set, update } from "firebase/database";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
-import { useDatabaseRef } from "./hooks/useDatabaseRef";
+import { useDatabaseRef } from "../hooks/useDatabaseRef";
 import { useNavigate, useParams } from "react-router-dom";
-import { DrawLine, Lines } from "./types";
-import { Point } from "./math";
+import { DrawLine, Lines } from "../types";
+import { Point } from "../math";
 
 type Props = {
   firebaseApp: FirebaseApp;
