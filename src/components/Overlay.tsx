@@ -1,10 +1,21 @@
-import { Box, CircularProgress, ToggleButton, ToggleButtonGroup } from "@mui/material"
-import React, { ChangeEvent, Dispatch, SetStateAction, useRef, useState } from "react"
-import OpenWithIcon from '@mui/icons-material/OpenWith';
-import ModeIcon from '@mui/icons-material/Mode';
-import ClearIcon from '@mui/icons-material/Clear';
-import ImageIcon from '@mui/icons-material/Image';
-import {FaEraser} from 'react-icons/fa';
+import {
+  Box,
+  CircularProgress,
+  ToggleButton,
+  ToggleButtonGroup,
+} from "@mui/material";
+import React, {
+  ChangeEvent,
+  Dispatch,
+  SetStateAction,
+  useRef,
+  useState,
+} from "react";
+import OpenWithIcon from "@mui/icons-material/OpenWith";
+import ModeIcon from "@mui/icons-material/Mode";
+import ClearIcon from "@mui/icons-material/Clear";
+import ImageIcon from "@mui/icons-material/Image";
+import { FaEraser } from "react-icons/fa";
 import { Mode } from "../types";
 
 type Props = {
@@ -12,21 +23,24 @@ type Props = {
   setMode: Dispatch<SetStateAction<Mode>>;
   setImage: (image: File) => Promise<void>;
   clearAllLines: () => void;
-}
+};
 
-function Overlay({mode, setMode, setImage, clearAllLines}: Props) {
+function Overlay({ mode, setMode, setImage, clearAllLines }: Props) {
   const imageSelectButtonRef = useRef<HTMLInputElement>(null);
   const [isImageUploading, setIsImageUploading] = useState(false);
 
-  const handleModeChange = (event: React.MouseEvent<HTMLElement>, nextView: Mode) => {
+  const handleModeChange = (
+    event: React.MouseEvent<HTMLElement>,
+    nextView: Mode
+  ) => {
     if (nextView !== null) {
       setMode(nextView);
     }
-  }
+  };
 
   const handleAllClearButton = () => {
     clearAllLines();
-  }
+  };
 
   const handleImageSelect = async (event: ChangeEvent<HTMLInputElement>) => {
     if (event.target.files === null || event.target.files.length !== 1) return;
@@ -39,11 +53,11 @@ function Overlay({mode, setMode, setImage, clearAllLines}: Props) {
     setIsImageUploading(true);
     await setImage(event.target.files[0]);
     setIsImageUploading(false);
-  }
+  };
 
   const handleImageSelectButton = () => {
     imageSelectButtonRef.current?.click();
-  }
+  };
 
   return (
     <>
@@ -55,8 +69,8 @@ function Overlay({mode, setMode, setImage, clearAllLines}: Props) {
           display: "flex",
           flexDirection: "column",
           "@media screen and (max-width:600px)": {
-            margin: "0rem"
-          }
+            margin: "0rem",
+          },
         }}
       >
         <ToggleButtonGroup
@@ -69,7 +83,7 @@ function Overlay({mode, setMode, setImage, clearAllLines}: Props) {
             background: "white",
             borderRadius: "4px",
             boxShadow: 20,
-            margin: "1rem"
+            margin: "1rem",
           }}
           onChange={handleModeChange}
         >
@@ -80,41 +94,51 @@ function Overlay({mode, setMode, setImage, clearAllLines}: Props) {
             <ModeIcon fontSize="large" />
           </ToggleButton>
           <ToggleButton value="erase">
-            <FaEraser style={{fontSize: "1.7rem"}}/>
+            <FaEraser style={{ fontSize: "1.7rem" }} />
           </ToggleButton>
         </ToggleButtonGroup>
-        <ToggleButton value="allclear"
+        <ToggleButton
+          value="allclear"
           sx={{
             background: "white",
             margin: "0 1rem",
             boxShadow: 20,
             ":hover": {
-              background: "#f5f5f5"
-            }
+              background: "#f5f5f5",
+            },
           }}
           onClick={handleAllClearButton}
         >
-          <ClearIcon fontSize="large"/>
+          <ClearIcon fontSize="large" />
         </ToggleButton>
-        <ToggleButton value="load" 
+        <ToggleButton
+          value="load"
           sx={{
             background: "white",
             margin: "1rem",
             boxShadow: 20,
             ":hover": {
-              background: "#f5f5f5"
-            }
+              background: "#f5f5f5",
+            },
           }}
           onClick={handleImageSelectButton}
         >
-          <input ref={imageSelectButtonRef} type="file" accept="image/*" hidden onChange={handleImageSelect}/>
-          {(isImageUploading) ? 
-              <CircularProgress color="inherit" size="2.1875rem" />
-            : <ImageIcon fontSize="large"/>}
+          <input
+            ref={imageSelectButtonRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={handleImageSelect}
+          />
+          {isImageUploading ? (
+            <CircularProgress color="inherit" size="2.1875rem" />
+          ) : (
+            <ImageIcon fontSize="large" />
+          )}
         </ToggleButton>
       </Box>
     </>
-  )
+  );
 }
 
-export {Overlay}
+export { Overlay };

@@ -1,11 +1,11 @@
 body {
-    /* user agent style sheetを打ち消す */
-    margin: 0;
+  /* user agent style sheetを打ち消す */
+  margin: 0;
 
-    font-family: sans-serif;
+  font-family: sans-serif;
 }
 
 body:has(canvas) {
-    overflow: hidden;
-    overscroll-behavior: none;
+  overflow: hidden;
+  overscroll-behavior: none;
 }
