@@ -1,6 +1,13 @@
 {
   "rules": {
-    ".read": "now < 1684508400000",
-    ".write": "now < 1684508400000"
+    ".read": false,
+    ".write": false,
+    "rooms": {
+      ".write": true,
+      "$roomId": {
+        ".read": "now < data.child('timestamp').val() + 1 * 24 * 60 * 60 * 1000",
+        ".write": "now < data.child('timestamp').val() + 1 * 24 * 60 * 60 * 1000"
+      }
+    }
   }
 }
