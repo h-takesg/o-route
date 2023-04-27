@@ -2,7 +2,7 @@ import { Card, CardContent, Typography } from "@mui/material";
 import { FirebaseApp } from "firebase/app";
 import { useNavigate } from "react-router-dom";
 import { useDatabaseRef } from "../hooks/useDatabaseRef";
-import { push } from "firebase/database";
+import { push, serverTimestamp } from "firebase/database";
 import Markdown from "marked-react";
 import homeDocument from "../documents/home_ja.md?raw";
 
@@ -18,7 +18,7 @@ function Home({ firebaseApp }: { firebaseApp: FirebaseApp }) {
     const newRoomRef = push(roomsRef, {
       image: "",
       lines: {},
-      timestamp: Date.now().toString(),
+      timestamp: serverTimestamp(),
     });
 
     navigate(`/rooms/${newRoomRef.key}`);

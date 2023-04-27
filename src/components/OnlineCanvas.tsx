@@ -11,6 +11,7 @@ import {
   onValue,
   push,
   remove,
+  serverTimestamp,
   set,
   update,
 } from "firebase/database";
@@ -68,25 +69,24 @@ function OnlineCanvas({ firebaseApp }: Props) {
         console.error("new line key is null");
         return;
       }
-
-      // for upload
-      set(drawingLineRef.current, newLine);
-
+      
       // for local
       setLines({
         ...lines,
         [drawingLineRef.current.key]: newLine,
       });
+
+      // for upload
+      const uploadLine = {
+        ...newLine,
+        timestamp: serverTimestamp(),
+      };
+      set(drawingLineRef.current, uploadLine);
+
     } else {
       const oldLine = lines[drawingLineRef.current.key];
       const oldLength = oldLine.points.length;
-
-      // for upload
-      update(child(drawingLineRef.current, "points"), {
-        [oldLength]: x,
-        [oldLength + 1]: y,
-      });
-
+      
       // for local
       const newLine = {
         ...oldLine,
@@ -95,6 +95,12 @@ function OnlineCanvas({ firebaseApp }: Props) {
       setLines({
         ...lines,
         [drawingLineRef.current.key]: newLine,
+      });
+
+      // for upload
+      update(child(drawingLineRef.current, "points"), {
+        [oldLength]: x,
+        [oldLength + 1]: y,
       });
     }
   };
@@ -147,7 +153,19 @@ function OnlineCanvas({ firebaseApp }: Props) {
         return { ...oldLines, [snapshot.key]: snapshot.val() };
       });
 
-      // snapshotが正常かつ自分以外の線でかつ描き込み中なら以降の更新をlistenする
+      // linesに既に存在しているならtimestampを上書きする
+      if (Object.keys(lines).includes(snapshot.key)) {
+        const newLine = {
+          ...lines[snapshot.key],
+          timestamp: snapshot.val().timestamp,
+        };
+        setLines({
+          ...lines,
+          [snapshot.key]: newLine
+        });
+      }
+
+      // 自分以外の線でかつ描き込み中なら以降の更新をlistenする
       if (
         drawingLineRef.current?.key !== snapshot.key &&
         snapshot.val().isDrawing
