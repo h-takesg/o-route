@@ -1,10 +1,13 @@
 import { useRef, useState } from "react";
 import { Canvas } from "./Canvas";
-import { Point } from "../math";
+import { Point, Vector } from "../math";
 import { Lines, DrawLine } from "../types";
 
 function LocalCanvas() {
   const [imageUrl, setImageUrl] = useState<string>("");
+  const [groupPosition, setGroupPosition] = useState(new Vector({x: 0, y: 0}));
+  const [groupScale, setGroupScale] = useState(1);
+  const [groupRotation, setGroupRotation] = useState(0);
   const drawingLineId = useRef<string | null>(null);
   const [lines, setLines] = useState<Lines>({});
 
@@ -84,6 +87,12 @@ function LocalCanvas() {
       endDrawing={endDrawing}
       removeLines={removeLines}
       clearAllLines={clearAllLines}
+      groupPosition={groupPosition}
+      groupScale={groupScale}
+      groupRotation={groupRotation}
+      setGroupPosition={setGroupPosition}
+      setGroupScale={setGroupScale}
+      setGroupRotation={setGroupRotation}
     />
   );
 }

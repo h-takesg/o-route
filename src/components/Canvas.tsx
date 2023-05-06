@@ -1,5 +1,5 @@
 import Konva from "konva";
-import { useRef, useState } from "react";
+import { Dispatch, SetStateAction, useRef, useState } from "react";
 import { Layer, Stage, Group, Line, Rect } from "react-konva";
 import { useWindowSize } from "../hooks/useWindwosSize";
 import { Lines, Mode } from "../types";
@@ -21,6 +21,12 @@ type Props = {
   endDrawing: () => void;
   removeLines: (ids: string[]) => void;
   clearAllLines: () => void;
+  groupPosition: Vector;
+  groupScale: number;
+  groupRotation: number;
+  setGroupPosition: Dispatch<SetStateAction<Vector>>;
+  setGroupScale: Dispatch<SetStateAction<number>>;
+  setGroupRotation: Dispatch<SetStateAction<number>>;
 };
 
 function Canvas({
@@ -31,6 +37,12 @@ function Canvas({
   endDrawing,
   removeLines,
   clearAllLines,
+  groupPosition,
+  groupScale,
+  groupRotation,
+  setGroupPosition,
+  setGroupScale,
+  setGroupRotation,
 }: Props) {
   const [width, height] = useWindowSize();
   const [mode, setMode] = useState<Mode>("move");
@@ -41,7 +53,7 @@ function Canvas({
   const beforePointersRotation = useRef<number | null>(null);
   const eraseMousemoveBeforePositionOnGroup = useRef<Vector | null>(null);
   const dragVelocity = useRef(new Vector({ x: 0, y: 0 }));
-  const dragMomentum = useRef<Konva.Tween | null>(null);
+  const dragMomentum = useRef<Konva.Animation | null>(null);
   const SCROLL_PER_SCALE = 160;
   const SCALE_BY = 1.1;
   const ROTATE_BY = 0.02;
@@ -53,12 +65,9 @@ function Canvas({
 
   // Canvasの座標で中心を指定しGroupをdegree回転させる
   const rotateAt = (centerOnStage: Vector, degree: number) => {
-    const group = groupRef.current;
-    if (group === null) return;
-
     const SNAPPING_DEGREE = 90;
 
-    const originalPositiveRotatedDegree = group.rotation() + degree + 360;
+    const originalPositiveRotatedDegree = groupRotation + degree + 360;
     // degreeが最も近いSNAPPING_DEGREEの倍数との差を求める
     const delta =
       ((originalPositiveRotatedDegree + SNAPPING_DEGREE / 2) %
@@ -68,33 +77,27 @@ function Canvas({
     // snappingDegreeごとにスナップを付ける
     const snappedDegree = Math.abs(delta) < 1 ? degree - delta : degree;
 
-    const groupPositionOnStage = new Vector(group.position());
-    const oldCenterToGroup = groupPositionOnStage.getSub(centerOnStage);
+    const oldCenterToGroup = groupPosition.getSub(centerOnStage);
     const newCenterToGroup = oldCenterToGroup.getRotated(snappedDegree);
     const newPosition = centerOnStage.getAdd(newCenterToGroup);
 
-    group.position(newPosition);
-    group.rotation((group.rotation() + snappedDegree) % 360);
+    setGroupPosition(newPosition);
+    setGroupRotation((groupRotation + snappedDegree) % 360);
   };
 
   // Canvasの座標で中心を指定しGroupをscale倍する
   const scaleAt = (centerOnStage: Vector, scale: number) => {
-    const stage = stageRef.current;
-    const group = groupRef.current;
-    if (stage === null || group === null) return;
-
-    const oldScale = group.scaleX();
-    const oldGroupOnStage = new Vector(group.position());
+    const oldScale = groupScale;
     const centerOnGroupNoRotation = centerOnStage
-      .getSub(oldGroupOnStage)
+      .getSub(groupPosition)
       .getScaled(1 / oldScale);
     const newScale = clamp(SCALE_MIN, oldScale * scale, SCALE_MAX);
     const newGroupOnStage = centerOnStage.getAdd(
       centerOnGroupNoRotation.getScaled(newScale).getReverse()
     );
 
-    group.scale({ x: newScale, y: newScale });
-    group.position(newGroupOnStage);
+    setGroupPosition(newGroupOnStage);
+    setGroupScale(newScale);
   };
 
   const handleMouseDown = () => {
@@ -105,8 +108,9 @@ function Canvas({
     beforePointersRotation.current = null;
 
     if (dragMomentum.current !== null) {
-      dragMomentum.current.destroy();
+      dragMomentum.current.stop();
       dragMomentum.current = null;
+      dragVelocity.current = new Vector({x: 0, y: 0});
     }
   };
 
@@ -142,7 +146,7 @@ function Canvas({
       case "move":
         if (pointerBeforeOnStage.current !== null) {
           const movement = pointerOnStage.getSub(pointerBeforeOnStage.current);
-          group.position(movement.getAdd(group.position()));
+          setGroupPosition(movement.getAdd(groupPosition));
           dragVelocity.current = movement;
         }
         pointerBeforeOnStage.current = pointerOnStage;
@@ -188,9 +192,6 @@ function Canvas({
   const handleTwoPointerMove = (event: Konva.KonvaEventObject<TouchEvent>) => {
     if (mode !== "move") return;
 
-    const group = groupRef.current;
-    if (group === null) return;
-
     const pointer0 = new Vector({
       x: event.evt.touches[0].pageX,
       y: event.evt.touches[0].pageY,
@@ -204,10 +205,14 @@ function Canvas({
     const pointersDistance = Math.max(1, pointer0ToPointer1.getSize());
     const pointersRotation = pointer0ToPointer1.getRotationDegree();
 
+    let newGroupPosition = groupPosition;
+    let newGroupScale = groupScale;
+    let newGroupRotation = groupRotation;
+
     // position
     if (pointerBeforeOnStage.current !== null) {
       const movement = midpoint.getSub(pointerBeforeOnStage.current);
-      group.position(movement.getAdd(group.position()));
+      newGroupPosition = newGroupPosition.getAdd(movement);
       dragVelocity.current = movement;
     }
     pointerBeforeOnStage.current = midpoint;
@@ -215,7 +220,15 @@ function Canvas({
     // scale
     if (beforePointersDistance.current !== null) {
       const scale = pointersDistance / beforePointersDistance.current;
-      scaleAt(new Vector(midpoint), scale);
+
+      const oldScale = newGroupScale;
+      const centerOnGroupNoRotation = midpoint
+        .getSub(newGroupPosition)
+        .getScaled(1 / oldScale);
+      newGroupScale = clamp(SCALE_MIN, oldScale * scale, SCALE_MAX);
+      newGroupPosition = midpoint.getAdd(
+        centerOnGroupNoRotation.getScaled(newGroupScale).getReverse()
+      );
     }
     beforePointersDistance.current = pointersDistance;
 
@@ -226,9 +239,17 @@ function Canvas({
         pointersRotation - beforePointersRotation.current + 360,
         pointersRotation - beforePointersRotation.current - 360
       );
-      rotateAt(new Vector(midpoint), rotation);
+
+      const oldCenterToGroup = newGroupPosition.getSub(midpoint);
+      const newCenterToGroup = oldCenterToGroup.getRotated(rotation);
+      newGroupPosition = midpoint.getAdd(newCenterToGroup);
+      newGroupRotation = (newGroupRotation + rotation) % 360; 
     }
     beforePointersRotation.current = pointersRotation;
+
+    setGroupPosition(newGroupPosition);
+    setGroupScale(newGroupScale);
+    setGroupRotation(newGroupRotation);
   };
 
   const handleMouseUp = (event: Konva.KonvaEventObject<MouseEvent>) => {
@@ -262,40 +283,41 @@ function Canvas({
   };
 
   const applyMomentum = () => {
-    const group = groupRef.current;
-    if (group === null) return;
+    dragMomentum.current = new Konva.Animation((frame) => {
+      if (typeof frame === "undefined") return;
 
-    const FLICTION = 4.15; // 時間的止まりやすさ
-    const WEIGHT = 60; // 慣性の強さ
-    const dragSpeed = Math.sqrt(dragVelocity.current.getSize()); // 速さ
-    const stoppingDuration = Math.sqrt(dragSpeed) / FLICTION; // 停止までの時間
-    const stoppingDistance = Math.sqrt(dragSpeed) * WEIGHT;
-    const stoppingMovement = dragVelocity.current.getScaled(
-      stoppingDistance / dragSpeed
-    );
+      const FLICTION = 1.05;
 
-    if (dragSpeed > 2.5) {
-      dragMomentum.current = new Konva.Tween({
-        node: group,
-        duration: stoppingDuration,
-        x: group.x() + stoppingMovement.x,
-        y: group.y() + stoppingMovement.y,
-        easing: Konva.Easings.EaseOut,
-      }).play();
-    }
+      const speed = dragVelocity.current.getSize();
+      
+      if (speed < 1) {
+        dragMomentum.current?.stop();
+        dragMomentum.current = null;
+        dragVelocity.current = new Vector({x: 0, y: 0});
+        return;
+      }
 
-    dragVelocity.current = new Vector({ x: 0, y: 0 });
+      // position
+      setGroupPosition((oldPosition) => {
+        const movement = dragVelocity.current;
+        return oldPosition.getAdd(movement);
+      });
+
+      // velocity
+      dragVelocity.current = dragVelocity.current.getScaled(1/FLICTION);
+    }).start();
   };
 
   const handleWheel = (event: Konva.KonvaEventObject<WheelEvent>) => {
     event.evt.preventDefault();
     const stage = stageRef.current;
-    const group = groupRef.current;
 
-    if (stage === null || group === null) return;
+    if (stage === null) return;
 
     // 慣性を止める
-    dragMomentum.current?.destroy();
+    dragMomentum.current?.stop();
+    dragMomentum.current = null;
+    dragVelocity.current = new Vector({x: 0, y: 0});
 
     if (event.evt.ctrlKey) {
       rotateAt(
@@ -317,6 +339,11 @@ function Canvas({
         <Layer>
           <Group
             ref={groupRef}
+            x={groupPosition.x}
+            y={groupPosition.y}
+            scaleX={groupScale}
+            scaleY={groupScale}
+            rotation={groupRotation}
             draggable={false}
             onWheel={handleWheel}
             onPointerDown={handleMouseDown}
