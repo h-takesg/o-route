@@ -10,17 +10,15 @@ import {
   closestToZero,
   intersectsLineSegment,
 } from "../math";
-import { Overlay } from "./Overlay";
 import { MapImage } from "./MapImage";
 
 type Props = {
+  mode: Mode;
   imageUrl: string;
-  setImage: (image: File) => Promise<void>;
   lines: Lines;
   addPointToDrawingLine: ({ x, y }: Point) => void;
   endDrawing: () => void;
   removeLines: (ids: string[]) => void;
-  clearAllLines: () => void;
   groupPosition: Vector;
   groupScale: number;
   groupRotation: number;
@@ -30,13 +28,12 @@ type Props = {
 };
 
 function Canvas({
+  mode,
   imageUrl,
-  setImage,
   lines,
   addPointToDrawingLine,
   endDrawing,
   removeLines,
-  clearAllLines,
   groupPosition,
   groupScale,
   groupRotation,
@@ -45,7 +42,6 @@ function Canvas({
   setGroupRotation,
 }: Props) {
   const [width, height] = useWindowSize();
-  const [mode, setMode] = useState<Mode>("move");
   const stageRef = useRef<Konva.Stage>(null);
   const groupRef = useRef<Konva.Group>(null);
   const pointerBeforeOnStage = useRef<Vector | null>(null);
@@ -374,12 +370,6 @@ function Canvas({
           </Group>
         </Layer>
       </Stage>
-      <Overlay
-        mode={mode}
-        setMode={setMode}
-        setImage={setImage}
-        clearAllLines={clearAllLines}
-      />
     </>
   );
 }

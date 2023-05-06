@@ -18,8 +18,9 @@ import {
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useDatabaseRef } from "../hooks/useDatabaseRef";
 import { useNavigate, useParams } from "react-router-dom";
-import { DrawLine, Lines } from "../types";
+import { DrawLine, Lines, Mode } from "../types";
 import { Point, Vector } from "../math";
+import { Overlay } from "./Overlay";
 
 type Props = {
   firebaseApp: FirebaseApp;
@@ -28,6 +29,7 @@ type Props = {
 function OnlineCanvas({ firebaseApp }: Props) {
   const { roomId } = useParams();
   const navigate = useNavigate();
+  const [mode, setMode] = useState<Mode>("move");
   const [imageUrl, setImageUrl] = useState<string>("");
   const drawingLineRef = useRef<DatabaseReference | null>(null);
   const linesRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/lines`);
@@ -201,21 +203,28 @@ function OnlineCanvas({ firebaseApp }: Props) {
   }, []);
 
   return (
-    <Canvas
-      imageUrl={imageUrl}
-      setImage={setImage}
-      lines={lines}
-      addPointToDrawingLine={addPointToDrawingLine}
-      endDrawing={endDrawing}
-      removeLines={removeLines}
-      clearAllLines={clearAllLines}
-      groupPosition={groupPosition}
-      groupScale={groupScale}
-      groupRotation={groupRotation}
-      setGroupPosition={setGroupPosition}
-      setGroupScale={setGroupScale}
-      setGroupRotation={setGroupRotation}
-    />
+    <>
+      <Canvas
+        mode={mode}
+        imageUrl={imageUrl}
+        lines={lines}
+        addPointToDrawingLine={addPointToDrawingLine}
+        endDrawing={endDrawing}
+        removeLines={removeLines}
+        groupPosition={groupPosition}
+        groupScale={groupScale}
+        groupRotation={groupRotation}
+        setGroupPosition={setGroupPosition}
+        setGroupScale={setGroupScale}
+        setGroupRotation={setGroupRotation}
+      />
+      <Overlay
+        mode={mode}
+        setMode={setMode}
+        setImage={setImage}
+        clearAllLines={clearAllLines}
+      />
+    </>
   );
 }
 
