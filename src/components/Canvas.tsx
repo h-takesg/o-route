@@ -1,7 +1,6 @@
 import Konva from "konva";
-import { Dispatch, SetStateAction, useRef, useState } from "react";
+import { Dispatch, SetStateAction, useRef } from "react";
 import { Layer, Stage, Group, Line, Rect } from "react-konva";
-import { useWindowSize } from "../hooks/useWindwosSize";
 import { Lines, Mode } from "../types";
 import {
   Point,
@@ -13,6 +12,8 @@ import {
 import { MapImage } from "./MapImage";
 
 type Props = {
+  width: number;
+  height: number;
   mode: Mode;
   imageUrl: string;
   lines: Lines;
@@ -28,6 +29,8 @@ type Props = {
 };
 
 function Canvas({
+  width,
+  height,
   mode,
   imageUrl,
   lines,
@@ -41,7 +44,6 @@ function Canvas({
   setGroupScale,
   setGroupRotation,
 }: Props) {
-  const [width, height] = useWindowSize();
   const stageRef = useRef<Konva.Stage>(null);
   const groupRef = useRef<Konva.Group>(null);
   const pointerBeforeOnStage = useRef<Vector | null>(null);
@@ -106,7 +108,7 @@ function Canvas({
     if (dragMomentum.current !== null) {
       dragMomentum.current.stop();
       dragMomentum.current = null;
-      dragVelocity.current = new Vector({x: 0, y: 0});
+      dragVelocity.current = new Vector({ x: 0, y: 0 });
     }
   };
 
@@ -239,7 +241,7 @@ function Canvas({
       const oldCenterToGroup = newGroupPosition.getSub(midpoint);
       const newCenterToGroup = oldCenterToGroup.getRotated(rotation);
       newGroupPosition = midpoint.getAdd(newCenterToGroup);
-      newGroupRotation = (newGroupRotation + rotation) % 360; 
+      newGroupRotation = (newGroupRotation + rotation) % 360;
     }
     beforePointersRotation.current = pointersRotation;
 
@@ -285,11 +287,11 @@ function Canvas({
       const FLICTION = 1.05;
 
       const speed = dragVelocity.current.getSize();
-      
+
       if (speed < 1) {
         dragMomentum.current?.stop();
         dragMomentum.current = null;
-        dragVelocity.current = new Vector({x: 0, y: 0});
+        dragVelocity.current = new Vector({ x: 0, y: 0 });
         return;
       }
 
@@ -300,7 +302,7 @@ function Canvas({
       });
 
       // velocity
-      dragVelocity.current = dragVelocity.current.getScaled(1/FLICTION);
+      dragVelocity.current = dragVelocity.current.getScaled(1 / FLICTION);
     }).start();
   };
 
@@ -313,7 +315,7 @@ function Canvas({
     // 慣性を止める
     dragMomentum.current?.stop();
     dragMomentum.current = null;
-    dragVelocity.current = new Vector({x: 0, y: 0});
+    dragVelocity.current = new Vector({ x: 0, y: 0 });
 
     if (event.evt.ctrlKey) {
       rotateAt(

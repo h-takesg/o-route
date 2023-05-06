@@ -3,9 +3,9 @@ import { ReactNode } from "react";
 
 type Props = {
   children: ReactNode;
-}
+};
 
-function Overlay({children}: Props) {
+function Overlay({ children }: Props) {
   return (
     <Box
       sx={{

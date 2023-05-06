@@ -18,28 +18,57 @@ import {
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useDatabaseRef } from "../hooks/useDatabaseRef";
 import { useNavigate, useParams } from "react-router-dom";
-import { DrawLine, Lines, Mode } from "../types";
+import { DrawLine, Lines, Mode, ViewMode } from "../types";
 import { Point, Vector } from "../math";
 import { Overlay } from "./Overlay";
 import { BasicControl } from "./BasicControl";
+import { ViewSharingControl } from "./ViewSharingControl";
+import { useWindowSize } from "../hooks/useWindwosSize";
 
 type Props = {
   firebaseApp: FirebaseApp;
 };
 
 function OnlineCanvas({ firebaseApp }: Props) {
+  const [width, height] = useWindowSize();
+  const widthRef = useRef(width);
+  const heightRef = useRef(height);
   const { roomId } = useParams();
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("move");
+  const [viewMode, setViewMode] = useState<ViewMode>("single");
+  const viewRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/view`);
+  const myViewLeaderId = useRef<string>("");
   const [imageUrl, setImageUrl] = useState<string>("");
   const drawingLineRef = useRef<DatabaseReference | null>(null);
   const linesRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/lines`);
   const imageUrlRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/image`);
   const storageRoomRef = useRef(ref(getStorage(firebaseApp), roomId));
-  const [groupPosition, setGroupPosition] = useState(new Vector({x: 0, y: 0}));
+  const [groupPosition, setGroupPosition] = useState(
+    new Vector({ x: 0, y: 0 })
+  );
   const [groupScale, setGroupScale] = useState(1);
   const [groupRotation, setGroupRotation] = useState(0);
+  const groupPositionRef = useRef(groupPosition);
+  const groupScaleRef = useRef(groupScale);
+  const groupRotationRef = useRef(groupRotation);
   const [lines, setLines] = useState<Lines>({});
+
+  useEffect(() => {
+    widthRef.current = width;
+  }, [width]);
+  useEffect(() => {
+    heightRef.current = height;
+  }, [height]);
+  useEffect(() => {
+    groupPositionRef.current = groupPosition;
+  }, [groupPosition]);
+  useEffect(() => {
+    groupScaleRef.current = groupScale;
+  }, [groupScale]);
+  useEffect(() => {
+    groupRotationRef.current = groupRotation;
+  }, [groupRotation]);
 
   const setImage = async (image: File) => {
     const newRef = ref(storageRoomRef.current, Date.now().toString());
@@ -75,7 +104,7 @@ function OnlineCanvas({ firebaseApp }: Props) {
         console.error("new line key is null");
         return;
       }
-      
+
       // for local
       setLines({
         ...lines,
@@ -88,11 +117,10 @@ function OnlineCanvas({ firebaseApp }: Props) {
         timestamp: serverTimestamp(),
       };
       set(drawingLineRef.current, uploadLine);
-
     } else {
       const oldLine = lines[drawingLineRef.current.key];
       const oldLength = oldLine.points.length;
-      
+
       // for local
       const newLine = {
         ...oldLine,
@@ -167,7 +195,7 @@ function OnlineCanvas({ firebaseApp }: Props) {
         };
         setLines({
           ...lines,
-          [snapshot.key]: newLine
+          [snapshot.key]: newLine,
         });
       }
 
@@ -203,9 +231,89 @@ function OnlineCanvas({ firebaseApp }: Props) {
     return () => off(linesRef);
   }, []);
 
+  const calcScale = (viewWidth: number, viewHeight: number) => {
+    return Math.min(width / viewWidth, height / viewHeight);
+  };
+
+  const generateView = () => ({
+    id: myViewLeaderId.current,
+    center: groupPositionRef.current
+      .getReverse()
+      .getAdd(
+        new Vector({ x: widthRef.current, y: heightRef.current }).getScaled(
+          1 / 2
+        )
+      )
+      .getScaled(1 / groupScaleRef.current)
+      .getRotated(-groupRotationRef.current),
+    area: {
+      height: heightRef.current / groupScaleRef.current,
+      width: widthRef.current / groupScaleRef.current,
+    },
+    rotation: groupRotationRef.current,
+  });
+
+  useEffect(() => {
+    switch (viewMode) {
+      case "single":
+        off(viewRef);
+        off(child(viewRef, "id"));
+        myViewLeaderId.current = "";
+        break;
+
+      case "follwer":
+        off(child(viewRef, "id"));
+        myViewLeaderId.current = "";
+
+        onValue(viewRef, (snapshot) => {
+          const newRotation: number = snapshot.child("rotation").val();
+          const newScale = calcScale(
+            snapshot.child("area").child("width").val(),
+            snapshot.child("area").child("height").val()
+          );
+          const newCenterOnGroupRotated = new Vector(
+            snapshot.child("center").val()
+          ).getRotated(newRotation);
+          const centerOnStage = new Vector({
+            x: widthRef.current,
+            y: heightRef.current,
+          }).getScaled(1 / 2);
+          const newPosition = centerOnStage.getAdd(
+            newCenterOnGroupRotated.getScaled(newScale).getReverse()
+          );
+
+          setGroupPosition(newPosition);
+          setGroupScale(newScale);
+          setGroupRotation(newRotation);
+        });
+        break;
+
+      case "leader":
+        off(viewRef);
+
+        myViewLeaderId.current = crypto.randomUUID();
+        set(viewRef, generateView());
+        onValue(child(viewRef, "id"), (snapshot) => {
+          console.log(snapshot.val());
+          if (snapshot.val() !== myViewLeaderId.current) {
+            setViewMode("follwer");
+          }
+        });
+        break;
+    }
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (viewMode === "leader") {
+      set(viewRef, generateView());
+    }
+  }, [groupPosition, groupScale, groupRotation]);
+
   return (
     <>
       <Canvas
+        width={width}
+        height={height}
         mode={mode}
         imageUrl={imageUrl}
         lines={lines}
@@ -225,7 +333,8 @@ function OnlineCanvas({ firebaseApp }: Props) {
           setMode={setMode}
           setImage={setImage}
           clearAllLines={clearAllLines}
-         />
+        />
+        <ViewSharingControl viewMode={viewMode} setViewMode={setViewMode} />
       </Overlay>
     </>
   );

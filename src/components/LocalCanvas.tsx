@@ -4,11 +4,15 @@ import { Point, Vector } from "../math";
 import { Lines, DrawLine, Mode } from "../types";
 import { Overlay } from "./Overlay";
 import { BasicControl } from "./BasicControl";
+import { useWindowSize } from "../hooks/useWindwosSize";
 
 function LocalCanvas() {
+  const [width, height] = useWindowSize();
   const [mode, setMode] = useState<Mode>("move");
   const [imageUrl, setImageUrl] = useState<string>("");
-  const [groupPosition, setGroupPosition] = useState(new Vector({x: 0, y: 0}));
+  const [groupPosition, setGroupPosition] = useState(
+    new Vector({ x: 0, y: 0 })
+  );
   const [groupScale, setGroupScale] = useState(1);
   const [groupRotation, setGroupRotation] = useState(0);
   const drawingLineId = useRef<string | null>(null);
@@ -84,6 +88,8 @@ function LocalCanvas() {
   return (
     <>
       <Canvas
+        width={width}
+        height={height}
         mode={mode}
         imageUrl={imageUrl}
         lines={lines}
@@ -103,7 +109,7 @@ function LocalCanvas() {
           setMode={setMode}
           setImage={setImage}
           clearAllLines={clearAllLines}
-         />
+        />
       </Overlay>
     </>
   );

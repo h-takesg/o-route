@@ -1,4 +1,8 @@
-import { CircularProgress, ToggleButton, ToggleButtonGroup } from "@mui/material";
+import {
+  CircularProgress,
+  ToggleButton,
+  ToggleButtonGroup,
+} from "@mui/material";
 import OpenWithIcon from "@mui/icons-material/OpenWith";
 import ModeIcon from "@mui/icons-material/Mode";
 import ClearIcon from "@mui/icons-material/Clear";
@@ -120,7 +124,7 @@ function BasicControl({ mode, setMode, setImage, clearAllLines }: Props) {
         )}
       </ToggleButton>
     </>
-  )
+  );
 }
 
 export { BasicControl };
