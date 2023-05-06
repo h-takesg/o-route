@@ -21,6 +21,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { DrawLine, Lines, Mode } from "../types";
 import { Point, Vector } from "../math";
 import { Overlay } from "./Overlay";
+import { BasicControl } from "./BasicControl";
 
 type Props = {
   firebaseApp: FirebaseApp;
@@ -218,12 +219,14 @@ function OnlineCanvas({ firebaseApp }: Props) {
         setGroupScale={setGroupScale}
         setGroupRotation={setGroupRotation}
       />
-      <Overlay
-        mode={mode}
-        setMode={setMode}
-        setImage={setImage}
-        clearAllLines={clearAllLines}
-      />
+      <Overlay>
+        <BasicControl
+          mode={mode}
+          setMode={setMode}
+          setImage={setImage}
+          clearAllLines={clearAllLines}
+         />
+      </Overlay>
     </>
   );
 }

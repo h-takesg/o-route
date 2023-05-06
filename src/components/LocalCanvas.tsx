@@ -3,6 +3,7 @@ import { Canvas } from "./Canvas";
 import { Point, Vector } from "../math";
 import { Lines, DrawLine, Mode } from "../types";
 import { Overlay } from "./Overlay";
+import { BasicControl } from "./BasicControl";
 
 function LocalCanvas() {
   const [mode, setMode] = useState<Mode>("move");
@@ -96,12 +97,14 @@ function LocalCanvas() {
         setGroupScale={setGroupScale}
         setGroupRotation={setGroupRotation}
       />
-      <Overlay
-        mode={mode}
-        setMode={setMode}
-        setImage={setImage}
-        clearAllLines={clearAllLines}
-      />
+      <Overlay>
+        <BasicControl
+          mode={mode}
+          setMode={setMode}
+          setImage={setImage}
+          clearAllLines={clearAllLines}
+         />
+      </Overlay>
     </>
   );
 }
