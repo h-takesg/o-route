@@ -19,7 +19,7 @@ import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useDatabaseRef } from "../hooks/useDatabaseRef";
 import { useNavigate, useParams } from "react-router-dom";
 import { DrawLine, Lines } from "../types";
-import { Point } from "../math";
+import { Point, Vector } from "../math";
 
 type Props = {
   firebaseApp: FirebaseApp;
@@ -33,6 +33,9 @@ function OnlineCanvas({ firebaseApp }: Props) {
   const linesRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/lines`);
   const imageUrlRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/image`);
   const storageRoomRef = useRef(ref(getStorage(firebaseApp), roomId));
+  const [groupPosition, setGroupPosition] = useState(new Vector({x: 0, y: 0}));
+  const [groupScale, setGroupScale] = useState(1);
+  const [groupRotation, setGroupRotation] = useState(0);
   const [lines, setLines] = useState<Lines>({});
 
   const setImage = async (image: File) => {
@@ -206,6 +209,12 @@ function OnlineCanvas({ firebaseApp }: Props) {
       endDrawing={endDrawing}
       removeLines={removeLines}
       clearAllLines={clearAllLines}
+      groupPosition={groupPosition}
+      groupScale={groupScale}
+      groupRotation={groupRotation}
+      setGroupPosition={setGroupPosition}
+      setGroupScale={setGroupScale}
+      setGroupRotation={setGroupRotation}
     />
   );
 }
