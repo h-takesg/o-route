@@ -39,6 +39,8 @@ function OnlineCanvas({ firebaseApp }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>("single");
   const viewRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/view`);
   const myViewLeaderId = useRef<string>("");
+  const viewSyncTimer = useRef<number | null>(null);
+  const isViewUpdated = useRef(false);
   const [imageUrl, setImageUrl] = useState<string>("");
   const drawingLineRef = useRef<DatabaseReference | null>(null);
   const linesRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/lines`);
@@ -53,6 +55,8 @@ function OnlineCanvas({ firebaseApp }: Props) {
   const groupScaleRef = useRef(groupScale);
   const groupRotationRef = useRef(groupRotation);
   const [lines, setLines] = useState<Lines>({});
+
+  const VIEW_SYNC_FPS = 30;
 
   useEffect(() => {
     widthRef.current = width;
@@ -256,12 +260,16 @@ function OnlineCanvas({ firebaseApp }: Props) {
   useEffect(() => {
     switch (viewMode) {
       case "single":
+        if (viewSyncTimer.current !== null)
+          clearInterval(viewSyncTimer.current);
         off(viewRef);
         off(child(viewRef, "id"));
         myViewLeaderId.current = "";
         break;
 
       case "follwer":
+        if (viewSyncTimer.current !== null)
+          clearInterval(viewSyncTimer.current);
         off(child(viewRef, "id"));
         myViewLeaderId.current = "";
 
@@ -299,13 +307,19 @@ function OnlineCanvas({ firebaseApp }: Props) {
             setViewMode("follwer");
           }
         });
+        viewSyncTimer.current = window.setInterval(() => {
+          if (isViewUpdated.current) {
+            set(viewRef, generateView());
+            isViewUpdated.current = false;
+          }
+        }, 1000 / VIEW_SYNC_FPS);
         break;
     }
   }, [viewMode]);
 
   useEffect(() => {
     if (viewMode === "leader") {
-      set(viewRef, generateView());
+      isViewUpdated.current = true;
     }
   }, [groupPosition, groupScale, groupRotation]);
 
