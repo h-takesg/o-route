@@ -68,7 +68,9 @@ PDF は読み込めません．
 勝手にデータやルームが消えることもあれば規定の時間を超えて残ることもありえます．
 機微なデータは入れないでください．
 
-## つくったひと
+## つくったひととか
 
 [@tooktwi](https://twitter.com/tooktwi)  
-意見要望はこちらへ
+[GitHub](https://github.com/h-takesg/o-route)
+
+意見要望は上記 Twitter or GitHub へ
