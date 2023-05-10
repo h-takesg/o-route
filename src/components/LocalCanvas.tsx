@@ -1,20 +1,17 @@
 import { useRef, useState } from "react";
 import { Canvas } from "./Canvas";
-import { Point, Vector } from "../math";
+import { Point } from "../math";
 import { Lines, DrawLine, Mode } from "../types";
 import { Overlay } from "./Overlay";
 import { BasicControl } from "./BasicControl";
 import { useWindowSize } from "../hooks/useWindwosSize";
+import { ViewModel } from "../ViewModel";
 
 function LocalCanvas() {
   const [width, height] = useWindowSize();
   const [mode, setMode] = useState<Mode>("move");
   const [imageUrl, setImageUrl] = useState<string>("");
-  const [groupPosition, setGroupPosition] = useState(
-    new Vector({ x: 0, y: 0 })
-  );
-  const [groupScale, setGroupScale] = useState(1);
-  const [groupRotation, setGroupRotation] = useState(0);
+  const [viewModel, setViewModel] = useState(new ViewModel());
   const drawingLineId = useRef<string | null>(null);
   const [lines, setLines] = useState<Lines>({});
 
@@ -96,12 +93,8 @@ function LocalCanvas() {
         addPointToDrawingLine={addPointToDrawingLine}
         endDrawing={endDrawing}
         removeLines={removeLines}
-        groupPosition={groupPosition}
-        groupScale={groupScale}
-        groupRotation={groupRotation}
-        setGroupPosition={setGroupPosition}
-        setGroupScale={setGroupScale}
-        setGroupRotation={setGroupRotation}
+        viewModel={viewModel}
+        setViewModel={setViewModel}
       />
       <Overlay>
         <BasicControl

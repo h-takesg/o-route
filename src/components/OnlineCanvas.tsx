@@ -24,6 +24,7 @@ import { Overlay } from "./Overlay";
 import { BasicControl } from "./BasicControl";
 import { ViewSharingControl } from "./ViewSharingControl";
 import { useWindowSize } from "../hooks/useWindwosSize";
+import { ViewModel } from "../ViewModel";
 
 type Props = {
   firebaseApp: FirebaseApp;
@@ -46,14 +47,8 @@ function OnlineCanvas({ firebaseApp }: Props) {
   const linesRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/lines`);
   const imageUrlRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/image`);
   const storageRoomRef = useRef(ref(getStorage(firebaseApp), roomId));
-  const [groupPosition, setGroupPosition] = useState(
-    new Vector({ x: 0, y: 0 })
-  );
-  const [groupScale, setGroupScale] = useState(1);
-  const [groupRotation, setGroupRotation] = useState(0);
-  const groupPositionRef = useRef(groupPosition);
-  const groupScaleRef = useRef(groupScale);
-  const groupRotationRef = useRef(groupRotation);
+  const [viewModel, setViewModel] = useState(new ViewModel());
+  const viewModelRef = useRef(viewModel);
   const [lines, setLines] = useState<Lines>({});
 
   const VIEW_SYNC_FPS = 30;
@@ -65,14 +60,8 @@ function OnlineCanvas({ firebaseApp }: Props) {
     heightRef.current = height;
   }, [height]);
   useEffect(() => {
-    groupPositionRef.current = groupPosition;
-  }, [groupPosition]);
-  useEffect(() => {
-    groupScaleRef.current = groupScale;
-  }, [groupScale]);
-  useEffect(() => {
-    groupRotationRef.current = groupRotation;
-  }, [groupRotation]);
+    viewModelRef.current = viewModel;
+  }, [viewModel]);
 
   const setImage = async (image: File) => {
     const newRef = ref(storageRoomRef.current, Date.now().toString());
@@ -241,20 +230,20 @@ function OnlineCanvas({ firebaseApp }: Props) {
 
   const generateView = () => ({
     id: myViewLeaderId.current,
-    center: groupPositionRef.current
+    center: viewModelRef.current.position
       .getReverse()
       .getAdd(
         new Vector({ x: widthRef.current, y: heightRef.current }).getScaled(
           1 / 2
         )
       )
-      .getScaled(1 / groupScaleRef.current)
-      .getRotated(-groupRotationRef.current),
+      .getScaled(1 / viewModelRef.current.scale)
+      .getRotated(-viewModelRef.current.rotation),
     area: {
-      height: heightRef.current / groupScaleRef.current,
-      width: widthRef.current / groupScaleRef.current,
+      height: heightRef.current / viewModelRef.current.scale,
+      width: widthRef.current / viewModelRef.current.scale,
     },
-    rotation: groupRotationRef.current,
+    rotation: viewModelRef.current.rotation,
   });
 
   useEffect(() => {
@@ -290,9 +279,11 @@ function OnlineCanvas({ firebaseApp }: Props) {
             newCenterOnGroupRotated.getScaled(newScale).getReverse()
           );
 
-          setGroupPosition(newPosition);
-          setGroupScale(newScale);
-          setGroupRotation(newRotation);
+          const newViewModel = new ViewModel()
+            .setPosition(newPosition)
+            .setScale(newScale)
+            .setRotation(newRotation);
+          setViewModel(newViewModel);
         });
         break;
 
@@ -321,7 +312,7 @@ function OnlineCanvas({ firebaseApp }: Props) {
     if (viewMode === "leader") {
       isViewUpdated.current = true;
     }
-  }, [groupPosition, groupScale, groupRotation]);
+  }, [viewModel]);
 
   return (
     <>
@@ -334,12 +325,8 @@ function OnlineCanvas({ firebaseApp }: Props) {
         addPointToDrawingLine={addPointToDrawingLine}
         endDrawing={endDrawing}
         removeLines={removeLines}
-        groupPosition={groupPosition}
-        groupScale={groupScale}
-        groupRotation={groupRotation}
-        setGroupPosition={setGroupPosition}
-        setGroupScale={setGroupScale}
-        setGroupRotation={setGroupRotation}
+        viewModel={viewModel}
+        setViewModel={setViewModel}
       />
       <Overlay>
         <BasicControl

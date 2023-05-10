@@ -2,14 +2,9 @@ import Konva from "konva";
 import { Dispatch, SetStateAction, useRef } from "react";
 import { Layer, Stage, Group, Line, Rect } from "react-konva";
 import { Lines, Mode } from "../types";
-import {
-  Point,
-  Vector,
-  clamp,
-  closestToZero,
-  intersectsLineSegment,
-} from "../math";
+import { Point, Vector, closestToZero, intersectsLineSegment } from "../math";
 import { MapImage } from "./MapImage";
+import { ViewModel } from "../ViewModel";
 
 type Props = {
   width: number;
@@ -20,12 +15,8 @@ type Props = {
   addPointToDrawingLine: ({ x, y }: Point) => void;
   endDrawing: () => void;
   removeLines: (ids: string[]) => void;
-  groupPosition: Vector;
-  groupScale: number;
-  groupRotation: number;
-  setGroupPosition: Dispatch<SetStateAction<Vector>>;
-  setGroupScale: Dispatch<SetStateAction<number>>;
-  setGroupRotation: Dispatch<SetStateAction<number>>;
+  viewModel: ViewModel;
+  setViewModel: Dispatch<SetStateAction<ViewModel>>;
 };
 
 function Canvas({
@@ -37,12 +28,8 @@ function Canvas({
   addPointToDrawingLine,
   endDrawing,
   removeLines,
-  groupPosition,
-  groupScale,
-  groupRotation,
-  setGroupPosition,
-  setGroupScale,
-  setGroupRotation,
+  viewModel,
+  setViewModel,
 }: Props) {
   const stageRef = useRef<Konva.Stage>(null);
   const groupRef = useRef<Konva.Group>(null);
@@ -52,7 +39,7 @@ function Canvas({
   const eraseMousemoveBeforePositionOnGroup = useRef<Vector | null>(null);
   const dragVelocity = useRef(new Vector({ x: 0, y: 0 }));
   const dragMomentum = useRef<Konva.Animation | null>(null);
-  const SCROLL_PER_SCALE = 160;
+  const SCALE_PER_SCROLL = 160;
   const SCALE_BY = 1.1;
   const ROTATE_BY = 0.02;
   const SCALE_MIN = 0.1;
@@ -60,43 +47,6 @@ function Canvas({
   const BACKGROUND_SIZE = 80000;
   const BACKGROUND_OFFSET = (BACKGROUND_SIZE * 2) / 5;
   const BACKGROUND_COLOR = "#dddddd";
-
-  // Canvasの座標で中心を指定しGroupをdegree回転させる
-  const rotateAt = (centerOnStage: Vector, degree: number) => {
-    const SNAPPING_DEGREE = 90;
-
-    const originalPositiveRotatedDegree = groupRotation + degree + 360;
-    // degreeが最も近いSNAPPING_DEGREEの倍数との差を求める
-    const delta =
-      ((originalPositiveRotatedDegree + SNAPPING_DEGREE / 2) %
-        SNAPPING_DEGREE) +
-      SNAPPING_DEGREE / 2;
-
-    // snappingDegreeごとにスナップを付ける
-    const snappedDegree = Math.abs(delta) < 1 ? degree - delta : degree;
-
-    const oldCenterToGroup = groupPosition.getSub(centerOnStage);
-    const newCenterToGroup = oldCenterToGroup.getRotated(snappedDegree);
-    const newPosition = centerOnStage.getAdd(newCenterToGroup);
-
-    setGroupPosition(newPosition);
-    setGroupRotation((groupRotation + snappedDegree) % 360);
-  };
-
-  // Canvasの座標で中心を指定しGroupをscale倍する
-  const scaleAt = (centerOnStage: Vector, scale: number) => {
-    const oldScale = groupScale;
-    const centerOnGroupNoRotation = centerOnStage
-      .getSub(groupPosition)
-      .getScaled(1 / oldScale);
-    const newScale = clamp(SCALE_MIN, oldScale * scale, SCALE_MAX);
-    const newGroupOnStage = centerOnStage.getAdd(
-      centerOnGroupNoRotation.getScaled(newScale).getReverse()
-    );
-
-    setGroupPosition(newGroupOnStage);
-    setGroupScale(newScale);
-  };
 
   const handleMouseDown = () => {
     if (mode !== "move") return;
@@ -144,7 +94,7 @@ function Canvas({
       case "move":
         if (pointerBeforeOnStage.current !== null) {
           const movement = pointerOnStage.getSub(pointerBeforeOnStage.current);
-          setGroupPosition(movement.getAdd(groupPosition));
+          setViewModel(viewModel.move(movement));
           dragVelocity.current = movement;
         }
         pointerBeforeOnStage.current = pointerOnStage;
@@ -203,14 +153,12 @@ function Canvas({
     const pointersDistance = Math.max(1, pointer0ToPointer1.getSize());
     const pointersRotation = pointer0ToPointer1.getRotationDegree();
 
-    let newGroupPosition = groupPosition;
-    let newGroupScale = groupScale;
-    let newGroupRotation = groupRotation;
+    let newViewModel = viewModel;
 
     // position
     if (pointerBeforeOnStage.current !== null) {
       const movement = midpoint.getSub(pointerBeforeOnStage.current);
-      newGroupPosition = newGroupPosition.getAdd(movement);
+      newViewModel = newViewModel.move(movement);
       dragVelocity.current = movement;
     }
     pointerBeforeOnStage.current = midpoint;
@@ -219,13 +167,11 @@ function Canvas({
     if (beforePointersDistance.current !== null) {
       const scale = pointersDistance / beforePointersDistance.current;
 
-      const oldScale = newGroupScale;
-      const centerOnGroupNoRotation = midpoint
-        .getSub(newGroupPosition)
-        .getScaled(1 / oldScale);
-      newGroupScale = clamp(SCALE_MIN, oldScale * scale, SCALE_MAX);
-      newGroupPosition = midpoint.getAdd(
-        centerOnGroupNoRotation.getScaled(newGroupScale).getReverse()
+      newViewModel = newViewModel.scaleAt(
+        midpoint,
+        scale,
+        SCALE_MIN,
+        SCALE_MAX
       );
     }
     beforePointersDistance.current = pointersDistance;
@@ -238,16 +184,11 @@ function Canvas({
         pointersRotation - beforePointersRotation.current - 360
       );
 
-      const oldCenterToGroup = newGroupPosition.getSub(midpoint);
-      const newCenterToGroup = oldCenterToGroup.getRotated(rotation);
-      newGroupPosition = midpoint.getAdd(newCenterToGroup);
-      newGroupRotation = (newGroupRotation + rotation) % 360;
+      newViewModel = newViewModel.rotateAt(midpoint, rotation);
     }
     beforePointersRotation.current = pointersRotation;
 
-    setGroupPosition(newGroupPosition);
-    setGroupScale(newGroupScale);
-    setGroupRotation(newGroupRotation);
+    setViewModel(newViewModel);
   };
 
   const handleMouseUp = (event: Konva.KonvaEventObject<MouseEvent>) => {
@@ -296,9 +237,9 @@ function Canvas({
       }
 
       // position
-      setGroupPosition((oldPosition) => {
+      setViewModel((oldViewModel) => {
         const movement = dragVelocity.current;
-        return oldPosition.getAdd(movement);
+        return oldViewModel.move(movement);
       });
 
       // velocity
@@ -318,16 +259,24 @@ function Canvas({
     dragVelocity.current = new Vector({ x: 0, y: 0 });
 
     if (event.evt.ctrlKey) {
-      rotateAt(
-        new Vector({ x: width / 2, y: height / 2 }),
-        event.evt.deltaY * ROTATE_BY
-      );
+      setViewModel((oldViewModel) => {
+        const center = new Vector({ x: width / 2, y: height / 2 });
+        const rotation = event.evt.deltaY * ROTATE_BY;
+        return oldViewModel.rotateAt(center, rotation);
+      });
     } else {
-      const scale = SCALE_BY ** (-event.evt.deltaY / SCROLL_PER_SCALE);
+      const scale = SCALE_BY ** (-event.evt.deltaY / SCALE_PER_SCROLL);
       const pointerPositionOnStage = stage.getPointerPosition();
       if (pointerPositionOnStage === null) return;
 
-      scaleAt(new Vector(pointerPositionOnStage), scale);
+      setViewModel((oldViewModel) =>
+        oldViewModel.scaleAt(
+          new Vector(pointerPositionOnStage),
+          scale,
+          SCALE_MIN,
+          SCALE_MAX
+        )
+      );
     }
   };
 
@@ -337,11 +286,11 @@ function Canvas({
         <Layer>
           <Group
             ref={groupRef}
-            x={groupPosition.x}
-            y={groupPosition.y}
-            scaleX={groupScale}
-            scaleY={groupScale}
-            rotation={groupRotation}
+            x={viewModel.position.x}
+            y={viewModel.position.y}
+            scaleX={viewModel.scale}
+            scaleY={viewModel.scale}
+            rotation={viewModel.rotation}
             draggable={false}
             onWheel={handleWheel}
             onPointerDown={handleMouseDown}
