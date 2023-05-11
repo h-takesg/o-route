@@ -58,9 +58,7 @@ function Canvas({
     beforePointersRotation.current = null;
 
     if (dragMomentum.current !== null) {
-      dragMomentum.current.stop();
-      dragMomentum.current = null;
-      dragVelocity.current = new Vector({ x: 0, y: 0 });
+      clearMomentum();
     }
   };
 
@@ -236,9 +234,7 @@ function Canvas({
       const speed = dragVelocity.current.getSize();
 
       if (speed < 1) {
-        dragMomentum.current?.stop();
-        dragMomentum.current = null;
-        dragVelocity.current = new Vector({ x: 0, y: 0 });
+        clearMomentum();
         return;
       }
 
@@ -253,16 +249,19 @@ function Canvas({
     }).start();
   };
 
+  const clearMomentum = () => {
+    dragMomentum.current?.stop();
+    dragMomentum.current = null;
+    dragVelocity.current = new Vector({x: 0, y: 0});
+  };
+
   const handleWheel = (event: Konva.KonvaEventObject<WheelEvent>) => {
     event.evt.preventDefault();
     const stage = stageRef.current;
 
     if (stage === null) return;
 
-    // 慣性を止める
-    dragMomentum.current?.stop();
-    dragMomentum.current = null;
-    dragVelocity.current = new Vector({ x: 0, y: 0 });
+    clearMomentum();
 
     if (event.evt.ctrlKey) {
       setViewModel((oldViewModel) => {
