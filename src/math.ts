@@ -1,6 +1,5 @@
-import { Vector2d } from "konva/lib/types";
-
-export type Point = Vector2d;
+export type VectorValue = { x: number; y: number };
+export type Point = VectorValue;
 export type LineSegment = [Point, Point];
 
 export const intersectsLineSegment = (
@@ -34,23 +33,23 @@ export const closestToZero = (...data: number[]) =>
 export const degreeToRadian = (degree: number) => (degree * Math.PI) / 180;
 export const radianToDegree = (radian: number) => (radian * 180) / Math.PI;
 
-export class Vector implements Vector2d {
+export class Vector {
   readonly x: number;
   readonly y: number;
 
-  constructor({ x, y }: Vector2d = { x: 0, y: 0 }) {
+  constructor({ x, y }: VectorValue = { x: 0, y: 0 }) {
     this.x = x;
     this.y = y;
   }
 
-  getAdd(vec: Vector2d): Vector {
+  getAdd(vec: VectorValue): Vector {
     return new Vector({
       x: this.x + vec.x,
       y: this.y + vec.y,
     });
   }
 
-  getSub(vec: Vector2d) {
+  getSub(vec: VectorValue) {
     return new Vector({
       x: this.x - vec.x,
       y: this.y - vec.y,

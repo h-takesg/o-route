@@ -88,7 +88,7 @@ function Canvas({
           ? event.evt.pageY
           : event.evt.touches[0].pageY,
     });
-    const pointerOnGroup = new Vector(group.getRelativePointerPosition());
+    const pointerOnGroup = group.getRelativePointerPosition();
 
     switch (mode) {
       case "move":
@@ -102,7 +102,7 @@ function Canvas({
         break;
 
       case "draw":
-        addPointToDrawingLine({ x: pointerOnGroup.x, y: pointerOnGroup.y });
+        addPointToDrawingLine(pointerOnGroup);
         break;
 
       case "erase":
@@ -133,7 +133,9 @@ function Canvas({
 
           removeLines(toBeRemoved);
         }
-        eraseMousemoveBeforePositionOnGroup.current = pointerOnGroup;
+        eraseMousemoveBeforePositionOnGroup.current = new Vector(
+          pointerOnGroup
+        );
         break;
     }
   };
@@ -274,7 +276,7 @@ function Canvas({
       if (pointerPositionOnStage === null) return;
 
       const newViewModel = viewModel.scaleAt(
-        new Vector(pointerPositionOnStage),
+        pointerPositionOnStage,
         scale,
         SCALE_MIN,
         SCALE_MAX
