@@ -34,7 +34,7 @@ function Canvas({
   const stageRef = useRef<Konva.Stage>(null);
   const groupRef = useRef<Konva.Group>(null);
   const pointerLastMoveTime = useRef(0);
-  const HOlD_THRESHOLD = 5;
+  const HOLD_THRESHOLD = 5;
   const pointerBeforeOnStage = useRef<Vector | null>(null);
   const beforePointersDistance = useRef<number | null>(null);
   const beforePointersRotation = useRef<number | null>(null);
@@ -224,7 +224,7 @@ function Canvas({
 
   const applyMomentum = () => {
     const now = Date.now();
-    if (now - pointerLastMoveTime.current > HOlD_THRESHOLD) return;
+    if (now - pointerLastMoveTime.current > HOLD_THRESHOLD) return;
 
     dragMomentum.current = new Konva.Animation((frame) => {
       if (typeof frame === "undefined") return;
@@ -264,24 +264,23 @@ function Canvas({
     clearMomentum();
 
     if (event.evt.ctrlKey) {
-      setViewModel((oldViewModel) => {
-        const center = new Vector({ x: width / 2, y: height / 2 });
-        const rotation = event.evt.deltaY * ROTATE_BY;
-        return oldViewModel.rotateAt(center, rotation);
-      });
+      const center = new Vector({ x: width / 2, y: height / 2 });
+      const rotation = event.evt.deltaY * ROTATE_BY;
+      const newViewModel = viewModel.rotateAt(center, rotation);
+      setViewModel(newViewModel);
     } else {
       const scale = SCALE_BY ** (-event.evt.deltaY / SCALE_PER_SCROLL);
       const pointerPositionOnStage = stage.getPointerPosition();
       if (pointerPositionOnStage === null) return;
 
-      setViewModel((oldViewModel) =>
-        oldViewModel.scaleAt(
-          new Vector(pointerPositionOnStage),
-          scale,
-          SCALE_MIN,
-          SCALE_MAX
-        )
+      const newViewModel = viewModel.scaleAt(
+        new Vector(pointerPositionOnStage),
+        scale,
+        SCALE_MIN,
+        SCALE_MAX
       );
+
+      setViewModel(newViewModel);
     }
   };
 
