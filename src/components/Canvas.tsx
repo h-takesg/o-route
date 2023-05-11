@@ -33,6 +33,8 @@ function Canvas({
 }: Props) {
   const stageRef = useRef<Konva.Stage>(null);
   const groupRef = useRef<Konva.Group>(null);
+  const pointerLastMoveTime = useRef(0);
+  const HOlD_THRESHOLD = 5;
   const pointerBeforeOnStage = useRef<Vector | null>(null);
   const beforePointersDistance = useRef<number | null>(null);
   const beforePointersRotation = useRef<number | null>(null);
@@ -97,6 +99,7 @@ function Canvas({
           setViewModel(viewModel.move(movement));
           dragVelocity.current = movement;
         }
+        pointerLastMoveTime.current = Date.now();
         pointerBeforeOnStage.current = pointerOnStage;
         break;
 
@@ -222,6 +225,9 @@ function Canvas({
   };
 
   const applyMomentum = () => {
+    const now = Date.now();
+    if (now - pointerLastMoveTime.current > HOlD_THRESHOLD) return;
+
     dragMomentum.current = new Konva.Animation((frame) => {
       if (typeof frame === "undefined") return;
 
