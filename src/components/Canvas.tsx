@@ -39,7 +39,7 @@ function Canvas({
   const beforePointersDistance = useRef<number | null>(null);
   const beforePointersRotation = useRef<number | null>(null);
   const eraseMousemoveBeforePositionOnGroup = useRef<Vector | null>(null);
-  const dragVelocity = useRef(new Vector({ x: 0, y: 0 }));
+  const dragVelocity = useRef(new Vector());
   const dragMomentum = useRef<Konva.Animation | null>(null);
   const SCALE_PER_SCROLL = 160;
   const SCALE_BY = 1.1;
@@ -252,7 +252,7 @@ function Canvas({
   const clearMomentum = () => {
     dragMomentum.current?.stop();
     dragMomentum.current = null;
-    dragVelocity.current = new Vector({x: 0, y: 0});
+    dragVelocity.current = new Vector();
   };
 
   const handleWheel = (event: Konva.KonvaEventObject<WheelEvent>) => {

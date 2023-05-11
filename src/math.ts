@@ -38,7 +38,7 @@ export class Vector implements Vector2d {
   readonly x: number;
   readonly y: number;
 
-  constructor({ x, y }: Vector2d) {
+  constructor({ x, y }: Vector2d = { x: 0, y: 0 }) {
     this.x = x;
     this.y = y;
   }
