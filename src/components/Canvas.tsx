@@ -1,8 +1,9 @@
 import Konva from "konva";
 import { Dispatch, SetStateAction, useRef } from "react";
 import { Layer, Stage, Group, Line, Rect } from "react-konva";
-import { Lines, Mode } from "../types";
-import { Point, Vector, closestToZero, intersectsLineSegment } from "../math";
+import { Mode } from "../types";
+import { Lines } from "../LineModel";
+import { Point, Vector, closestToZero } from "../math";
 import { MapImage } from "./MapImage";
 import { ViewModel } from "../ViewModel";
 
@@ -111,26 +112,7 @@ function Canvas({
             eraseMousemoveBeforePositionOnGroup.current;
           const pointerPoint: Point = pointerOnGroup;
 
-          const toBeRemoved: string[] = [];
-
-          for (const key in lines) {
-            const line = lines[key];
-            for (let i = 0; i < line.points.length / 2 - 1; i++) {
-              if (
-                intersectsLineSegment(
-                  [beforePoint, pointerPoint],
-                  [
-                    { x: line.points[i * 2], y: line.points[i * 2 + 1] },
-                    { x: line.points[i * 2 + 2], y: line.points[i * 2 + 3] },
-                  ]
-                )
-              ) {
-                toBeRemoved.push(key);
-                break;
-              }
-            }
-          }
-
+          const toBeRemoved = lines.getCrossingLine(beforePoint, pointerPoint);
           removeLines(toBeRemoved);
         }
         eraseMousemoveBeforePositionOnGroup.current = new Vector(
@@ -313,17 +295,19 @@ function Canvas({
               fill={BACKGROUND_COLOR}
             />
             <MapImage url={imageUrl} />
-            {Object.entries(lines).map(([key, line]) => (
-              <Line
-                key={key}
-                id={key}
-                points={line.points}
-                globalCompositeOperation={line.compositionMode}
-                stroke="red"
-                lineCap="round"
-                strokeWidth={8}
-              />
-            ))}
+            {lines.lines.entrySeq().map(([key, line]) => {
+              return (
+                <Line
+                  key={key}
+                  id={key}
+                  points={line.points.toArray()}
+                  globalCompositeOperation={line.compositionMode}
+                  stroke="red"
+                  lineCap="round"
+                  strokeWidth={8}
+                />
+              );
+            })}
           </Group>
         </Layer>
       </Stage>

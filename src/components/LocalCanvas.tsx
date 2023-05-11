@@ -1,7 +1,8 @@
 import { useRef, useState } from "react";
 import { Canvas } from "./Canvas";
 import { Point } from "../math";
-import { Lines, DrawLine, Mode } from "../types";
+import { Mode } from "../types";
+import { Lines, DrawLine } from "../LineModel";
 import { Overlay } from "./Overlay";
 import { BasicControl } from "./BasicControl";
 import { useWindowSize } from "../hooks/useWindwosSize";
@@ -13,73 +14,40 @@ function LocalCanvas() {
   const [imageUrl, setImageUrl] = useState<string>("");
   const [viewModel, setViewModel] = useState(new ViewModel());
   const drawingLineId = useRef<string | null>(null);
-  const [lines, setLines] = useState<Lines>({});
+  const [lines, setLines] = useState(new Lines());
 
   const setImage = async (image: File) => {
     const newUrl = URL.createObjectURL(image);
     setImageUrl(newUrl);
   };
 
-  const addPointToDrawingLine = ({ x, y }: Point) => {
+  const addPointToDrawingLine = (point: Point) => {
     if (
       drawingLineId.current === null ||
-      !Object.keys(lines).includes(drawingLineId.current)
+      !lines.lines.keySeq().includes(drawingLineId.current)
     ) {
-      const newLine: DrawLine = {
-        isDrawing: true,
-        timestamp: Date.now().toString(),
-        points: [x, y],
-        compositionMode: "source-over",
-      };
-      drawingLineId.current = getNewId();
+      const newLine = new DrawLine({ isDrawing: true }).addPoint(point);
+      const [newLines, newKey] = lines.addLine(newLine);
 
-      setLines({
-        ...lines,
-        [drawingLineId.current]: newLine,
-      });
+      drawingLineId.current = newKey;
+      setLines(newLines);
     } else {
-      const oldLine = lines[drawingLineId.current];
-
-      const newLine = {
-        ...oldLine,
-        points: [...oldLine.points, x, y],
-      };
-      setLines({
-        ...lines,
-        [drawingLineId.current]: newLine,
-      });
-    }
-  };
-
-  const getNewId = () => {
-    if (Object.keys(lines).length === 0) return "0";
-    else {
-      const ids = Object.keys(lines).map((e) => Number(e));
-      return (Math.max(...ids) + 1).toString();
+      setLines(lines.addPoint(drawingLineId.current, point));
     }
   };
 
   const endDrawing = () => {
-    setLines((oldLines) => {
-      if (drawingLineId.current === null) return oldLines;
-
-      const temp = { ...oldLines };
-      temp[drawingLineId.current].isDrawing = false;
-      drawingLineId.current = null;
-      return temp;
-    });
+    if (drawingLineId.current === null) return;
+    setLines(lines.endDrawing(drawingLineId.current));
+    drawingLineId.current = null;
   };
 
   const removeLines = (ids: string[]) => {
-    setLines((oldLines) => {
-      const temp = { ...oldLines };
-      ids.forEach((id) => delete temp[id]);
-      return temp;
-    });
+    setLines(lines.removeLine(...ids));
   };
 
   const clearAllLines = () => {
-    setLines({});
+    setLines(new Lines());
   };
 
   return (
