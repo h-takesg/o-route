@@ -1,5 +1,5 @@
 import { Record } from "immutable";
-import { Vector, VectorValue, clamp } from "./math";
+import { Vector, VectorValue, clamp } from "../math";
 
 const _ViewModelBase = Record({
   position: new Vector({ x: 0, y: 0 }),

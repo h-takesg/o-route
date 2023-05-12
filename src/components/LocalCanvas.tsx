@@ -2,11 +2,11 @@ import { useRef, useState } from "react";
 import { Canvas } from "./Canvas";
 import { Point } from "../math";
 import { Mode } from "../types";
-import { Lines, DrawLine } from "../LineModel";
+import { Lines, DrawLine } from "../models/LineModel";
 import { Overlay } from "./Overlay";
 import { BasicControl } from "./BasicControl";
 import { useWindowSize } from "../hooks/useWindwosSize";
-import { ViewModel } from "../ViewModel";
+import { ViewModel } from "../models/ViewModel";
 
 function LocalCanvas() {
   const [width, height] = useWindowSize();

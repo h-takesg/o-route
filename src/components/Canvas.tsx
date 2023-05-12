@@ -2,10 +2,10 @@ import Konva from "konva";
 import { Dispatch, SetStateAction, useRef } from "react";
 import { Layer, Stage, Group, Line, Rect } from "react-konva";
 import { Mode } from "../types";
-import { Lines } from "../LineModel";
+import { Lines } from "../models/LineModel";
 import { Point, Vector, closestToZero } from "../math";
 import { MapImage } from "./MapImage";
-import { ViewModel } from "../ViewModel";
+import { ViewModel } from "../models/ViewModel";
 
 type Props = {
   width: number;

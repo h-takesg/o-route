@@ -1,5 +1,5 @@
 import { List, Map, Record } from "immutable";
-import { Point, intersectsLineSegment } from "./math";
+import { Point, intersectsLineSegment } from "../math";
 
 const DrawLineBase = Record({
   isDrawing: false,

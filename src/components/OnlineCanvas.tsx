@@ -19,13 +19,13 @@ import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useDatabaseRef } from "../hooks/useDatabaseRef";
 import { useNavigate, useParams } from "react-router-dom";
 import { Mode, ViewMode } from "../types";
-import { DrawLine, Lines } from "../LineModel";
+import { DrawLine, Lines } from "../models/LineModel";
 import { Point, Vector } from "../math";
 import { Overlay } from "./Overlay";
 import { BasicControl } from "./BasicControl";
 import { ViewSharingControl } from "./ViewSharingControl";
 import { useWindowSize } from "../hooks/useWindwosSize";
-import { ViewModel } from "../ViewModel";
+import { ViewModel } from "../models/ViewModel";
 
 type Props = {
   firebaseApp: FirebaseApp;
