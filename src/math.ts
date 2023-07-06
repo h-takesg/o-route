@@ -4,7 +4,7 @@ export type LineSegment = [Point, Point];
 
 export const intersectsLineSegment = (
   l1: LineSegment,
-  l2: LineSegment
+  l2: LineSegment,
 ): boolean => {
   const [p1, p2] = l1,
     [p3, p4] = l2;

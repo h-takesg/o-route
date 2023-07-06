@@ -30,7 +30,7 @@ function BasicControl({ mode, setMode, setImage, clearAllLines }: Props) {
 
   const handleModeChange = (
     event: React.MouseEvent<HTMLElement>,
-    nextView: Mode
+    nextView: Mode,
   ) => {
     if (nextView !== null) {
       setMode(nextView);

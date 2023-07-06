@@ -36,7 +36,7 @@
     "eslint-plugin-import": "^2.27.5",
     "eslint-plugin-react": "^7.32.2",
     "firebase-tools": "^12.0.0",
-    "prettier": "^2.8.8",
+    "prettier": "^3.0.0",
     "typescript": "^4.9.3",
     "vite": "^4.2.0"
   }

@@ -72,7 +72,7 @@ function Canvas({
   };
 
   const handleOnePointerMove = (
-    event: Konva.KonvaEventObject<MouseEvent | TouchEvent>
+    event: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
   ) => {
     if (event.evt instanceof MouseEvent && event.evt.buttons === 0) return;
 
@@ -116,7 +116,7 @@ function Canvas({
           removeLines(toBeRemoved);
         }
         eraseMousemoveBeforePositionOnGroup.current = new Vector(
-          pointerOnGroup
+          pointerOnGroup,
         );
         break;
     }
@@ -156,7 +156,7 @@ function Canvas({
         midpoint,
         scale,
         SCALE_MIN,
-        SCALE_MAX
+        SCALE_MAX,
       );
     }
     beforePointersDistance.current = pointersDistance;
@@ -166,7 +166,7 @@ function Canvas({
       const rotation = closestToZero(
         pointersRotation - beforePointersRotation.current,
         pointersRotation - beforePointersRotation.current + 360,
-        pointersRotation - beforePointersRotation.current - 360
+        pointersRotation - beforePointersRotation.current - 360,
       );
 
       newViewModel = newViewModel.rotateAt(midpoint, rotation);
@@ -261,7 +261,7 @@ function Canvas({
         pointerPositionOnStage,
         scale,
         SCALE_MIN,
-        SCALE_MAX
+        SCALE_MAX,
       );
 
       setViewModel(newViewModel);

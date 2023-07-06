@@ -70,8 +70,8 @@ function OnlineCanvas({ firebaseApp }: Props) {
       cacheControl: "private, max-age=86400",
     }).catch(() =>
       alert(
-        "アップロードに失敗しました．ネットワーク不調もしくはファイルが大きすぎるかもしれません．20MB未満のファイルを使用してください．"
-      )
+        "アップロードに失敗しました．ネットワーク不調もしくはファイルが大きすぎるかもしれません．20MB未満のファイルを使用してください．",
+      ),
     );
 
     if (typeof result === "undefined") return;
@@ -162,7 +162,7 @@ function OnlineCanvas({ firebaseApp }: Props) {
           }
           return oldLines.updateTimestamp(
             snapshot.key,
-            snapshot.child("timestamp").val()
+            snapshot.child("timestamp").val(),
           );
         });
       } else {
@@ -175,7 +175,7 @@ function OnlineCanvas({ firebaseApp }: Props) {
           }
           return oldLines.addLineWithKey(
             snapshot.key,
-            DrawLine.of(snapshot.val())
+            DrawLine.of(snapshot.val()),
           );
         });
 
@@ -183,7 +183,7 @@ function OnlineCanvas({ firebaseApp }: Props) {
         if (snapshot.val().isDrawing) {
           onChildAdded(
             child(linesRef, `${snapshot.key}/points`),
-            addNewPointFactory(snapshot.key)
+            addNewPointFactory(snapshot.key),
           );
           onValue(
             child(linesRef, `${snapshot.key}/isDrawing`),
@@ -192,7 +192,7 @@ function OnlineCanvas({ firebaseApp }: Props) {
                 off(child(linesRef, `${snapshot.key}/isDrawing`));
                 off(child(linesRef, `${snapshot.key}/points`));
               }
-            }
+            },
           );
         }
       }
@@ -217,8 +217,8 @@ function OnlineCanvas({ firebaseApp }: Props) {
       .getReverse()
       .getAdd(
         new Vector({ x: widthRef.current, y: heightRef.current }).getScaled(
-          1 / 2
-        )
+          1 / 2,
+        ),
       )
       .getScaled(1 / viewModelRef.current.scale)
       .getRotated(-viewModelRef.current.rotation),
@@ -249,17 +249,17 @@ function OnlineCanvas({ firebaseApp }: Props) {
           const newRotation: number = snapshot.child("rotation").val();
           const newScale = calcScale(
             snapshot.child("area").child("width").val(),
-            snapshot.child("area").child("height").val()
+            snapshot.child("area").child("height").val(),
           );
           const newCenterOnGroupRotated = new Vector(
-            snapshot.child("center").val()
+            snapshot.child("center").val(),
           ).getRotated(newRotation);
           const centerOnStage = new Vector({
             x: widthRef.current,
             y: heightRef.current,
           }).getScaled(1 / 2);
           const newPosition = centerOnStage.getAdd(
-            newCenterOnGroupRotated.getScaled(newScale).getReverse()
+            newCenterOnGroupRotated.getScaled(newScale).getReverse(),
           );
 
           const newViewModel = new ViewModel()
