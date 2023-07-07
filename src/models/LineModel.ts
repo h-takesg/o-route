@@ -58,7 +58,6 @@ class Lines extends LinesBase {
   addLine(line: DrawLine): [newLines: this, key: string] {
     const key = this.getNewKey();
     const newLines = this.setIn(["lines", key], line);
-    console.log(newLines, key);
     return [newLines, key];
   }
 
