@@ -9,3 +9,8 @@ body:has(canvas) {
   overflow: hidden;
   overscroll-behavior: none;
 }
+
+p {
+  line-height: 150%;
+  letter-spacing: 0.02rem;
+}

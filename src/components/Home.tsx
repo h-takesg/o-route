@@ -1,13 +1,12 @@
 import { Card, CardContent, Typography } from "@mui/material";
-import { FirebaseApp } from "firebase/app";
-import { useNavigate } from "react-router-dom";
+import { navigate } from "vite-plugin-ssr/client/router";
 import { useDatabaseRef } from "../hooks/useDatabaseRef";
 import { push, serverTimestamp } from "firebase/database";
 import Markdown from "marked-react";
 import homeDocument from "../documents/home_ja.md?raw";
+import { firebaseApp } from "../firebase";
 
-function Home({ firebaseApp }: { firebaseApp: FirebaseApp }) {
-  const navigate = useNavigate();
+function Home() {
   const roomsRef = useDatabaseRef(firebaseApp, "rooms");
 
   const enterLocalRoom = () => {
@@ -21,7 +20,14 @@ function Home({ firebaseApp }: { firebaseApp: FirebaseApp }) {
       timestamp: serverTimestamp(),
     });
 
-    navigate(`/rooms/${newRoomRef.key}`);
+    if (newRoomRef.key === null) {
+      alert("新しいルームの作成に失敗しました");
+      return;
+    }
+
+    const query = new URLSearchParams([["roomId", newRoomRef.key]]);
+
+    navigate(`/online?${query}`);
   };
 
   return (
@@ -57,9 +63,9 @@ function Home({ firebaseApp }: { firebaseApp: FirebaseApp }) {
               モード
             </Typography>
             <Typography variant="body2">
-              <p>ひとりで使う</p>
-              <p>端末上に保存</p>
-              <p>タブを閉じる or 更新するまで有効</p>
+              ひとりで使う<br />
+              端末上に保存<br />
+              タブを閉じる or 更新するまで有効<br />
             </Typography>
             <Typography align="center" color="primary">
               ENTER
@@ -81,9 +87,9 @@ function Home({ firebaseApp }: { firebaseApp: FirebaseApp }) {
               モード
             </Typography>
             <Typography variant="body2">
-              <p>みんなで使う</p>
-              <p>サーバー上に保存</p>
-              <p>24時間有効</p>
+              みんなで使う<br />
+              サーバー上に保存<br />
+              24時間有効<br />
             </Typography>
             <Typography align="center" color="primary">
               ENTER

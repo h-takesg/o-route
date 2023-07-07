@@ -1,10 +1,11 @@
-import { FirebaseApp } from "firebase/app";
+import { firebaseApp } from "../firebase";
 import { Canvas } from "./Canvas";
 import { useEffect, useRef, useState } from "react";
 import {
   DataSnapshot,
   DatabaseReference,
   child,
+  get,
   off,
   onChildAdded,
   onChildRemoved,
@@ -17,7 +18,7 @@ import {
 } from "firebase/database";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useDatabaseRef } from "../hooks/useDatabaseRef";
-import { useNavigate, useParams } from "react-router-dom";
+import { navigate } from "vite-plugin-ssr/client/router";
 import { Mode, ViewMode } from "../types";
 import { DrawLine, Lines } from "../models/LineModel";
 import { Point, Vector } from "../math";
@@ -28,15 +29,13 @@ import { useWindowSize } from "../hooks/useWindwosSize";
 import { ViewModel } from "../models/ViewModel";
 
 type Props = {
-  firebaseApp: FirebaseApp;
+  roomId: string;
 };
 
-function OnlineCanvas({ firebaseApp }: Props) {
+function OnlineCanvas({ roomId }: Props) {
   const [width, height] = useWindowSize();
   const widthRef = useRef(width);
   const heightRef = useRef(height);
-  const { roomId } = useParams();
-  const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("move");
   const [viewMode, setViewMode] = useState<ViewMode>("single");
   const viewRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/view`);
@@ -134,9 +133,16 @@ function OnlineCanvas({ firebaseApp }: Props) {
   };
 
   useEffect(() => {
+    (async () => {
+      try {
+        await get(imageUrlRef);
+      } catch(e) {
+        // Permission denied
+        navigate("/errors/room_not_found");
+      }
+    })();
     return onValue(imageUrlRef, (snapshot) => {
       if (snapshot.exists()) setImageUrl(snapshot.val());
-      else navigate("/errors/room_not_found");
     });
   }, []);
 

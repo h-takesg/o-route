@@ -1,9 +1,7 @@
 import { Button } from "@mui/material";
-import { useNavigate } from "react-router-dom";
+import { navigate } from "vite-plugin-ssr/client/router";
 
 function RoomNotFound() {
-  const navigate = useNavigate();
-
   const gotoHome = () => {
     navigate("/");
   };

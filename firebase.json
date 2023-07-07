@@ -3,7 +3,7 @@
     "rules": "database.rules.json"
   },
   "hosting": {
-    "public": "dist",
+    "public": "dist/client",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "headers": [{
         "source": "**",
@@ -11,13 +11,7 @@
           "key": "Cache-Control",
           "value": "no-cache, no-store, must-revalidate"
         }]
-    }],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ]
+    }]
   },
   "storage": {
     "rules": "storage.rules"
