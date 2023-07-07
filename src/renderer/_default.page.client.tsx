@@ -1,13 +1,13 @@
-export { render }
-export const clientRouting = true
-export const hydrationCanBeAborted = true
+export { render };
+export const clientRouting = true;
+export const hydrationCanBeAborted = true;
 
-import { Root, createRoot, hydrateRoot } from 'react-dom/client'
-import { PageShell } from './PageShell'
-import type { PageContextClient } from './types'
+import { Root, createRoot, hydrateRoot } from "react-dom/client";
+import { PageShell } from "./PageShell";
+import type { PageContextClient } from "./types";
 
 let root: Root;
-async function render(pageContext: PageContextClient) {  
+async function render(pageContext: PageContextClient) {
   const { Page, pageProps } = pageContext;
 
   const page = (

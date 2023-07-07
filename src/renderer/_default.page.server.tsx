@@ -1,20 +1,20 @@
-export { render }
+export { render };
 // See https://vite-plugin-ssr.com/data-fetching
-export const passToClient = ['pageProps', 'urlPathname']
+export const passToClient = ["pageProps", "urlPathname"];
 
-import ReactDOMServer from 'react-dom/server'
-import { PageShell } from './PageShell'
-import { escapeInject, dangerouslySkipEscape } from 'vite-plugin-ssr/server'
+import ReactDOMServer from "react-dom/server";
+import { PageShell } from "./PageShell";
+import { escapeInject, dangerouslySkipEscape } from "vite-plugin-ssr/server";
 import type { PageContextBuiltIn } from "vite-plugin-ssr/types";
 
 async function render(pageContext: PageContextBuiltIn) {
-  const { Page } = pageContext
+  const { Page } = pageContext;
   let pageHtml;
   if (pageContext.Page) {
     pageHtml = ReactDOMServer.renderToString(
       <PageShell pageContext={pageContext}>
         <Page />
-      </PageShell>
+      </PageShell>,
     );
   } else {
     pageHtml = "";
@@ -30,5 +30,5 @@ async function render(pageContext: PageContextBuiltIn) {
       <body>
         <div id="root">${dangerouslySkipEscape(pageHtml)}</div>
       </body>
-    </html>`
+    </html>`;
 }

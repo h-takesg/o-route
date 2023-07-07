@@ -63,9 +63,12 @@ function Home() {
               モード
             </Typography>
             <Typography variant="body2">
-              ひとりで使う<br />
-              端末上に保存<br />
-              タブを閉じる or 更新するまで有効<br />
+              ひとりで使う
+              <br />
+              端末上に保存
+              <br />
+              タブを閉じる or 更新するまで有効
+              <br />
             </Typography>
             <Typography align="center" color="primary">
               ENTER
@@ -87,9 +90,12 @@ function Home() {
               モード
             </Typography>
             <Typography variant="body2">
-              みんなで使う<br />
-              サーバー上に保存<br />
-              24時間有効<br />
+              みんなで使う
+              <br />
+              サーバー上に保存
+              <br />
+              24時間有効
+              <br />
             </Typography>
             <Typography align="center" color="primary">
               ENTER

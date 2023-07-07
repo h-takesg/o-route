@@ -136,7 +136,7 @@ function OnlineCanvas({ roomId }: Props) {
     (async () => {
       try {
         await get(imageUrlRef);
-      } catch(e) {
+      } catch (e) {
         // Permission denied
         navigate("/errors/room_not_found");
       }

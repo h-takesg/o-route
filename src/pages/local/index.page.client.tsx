@@ -1,11 +1,11 @@
-import { LocalCanvas } from '../../components/LocalCanvas';
+import { LocalCanvas } from "../../components/LocalCanvas";
 
-export { Page }
+export { Page };
 
 function Page() {
   return (
     <>
       <LocalCanvas />
     </>
-  )
+  );
 }

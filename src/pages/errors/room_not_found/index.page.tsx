@@ -1,11 +1,11 @@
-import { RoomNotFound } from '../../../components/RoomNotFound';
+import { RoomNotFound } from "../../../components/RoomNotFound";
 
-export { Page }
+export { Page };
 
 function Page() {
   return (
     <>
       <RoomNotFound />
     </>
-  )
+  );
 }

@@ -1,14 +1,13 @@
-import { OnlineCanvas } from '../../components/OnlineCanvas';
+import { OnlineCanvas } from "../../components/OnlineCanvas";
 
-export { Page }
+export { Page };
 
 function Page() {
-
   const params = new URLSearchParams(window.location.search);
   const roomId = params.get("roomId");
 
   if (roomId === null) {
-    window.location.href = "/errors/room_not_found"
+    window.location.href = "/errors/room_not_found";
     return;
   }
 
@@ -16,5 +15,5 @@ function Page() {
     <>
       <OnlineCanvas roomId={roomId} />
     </>
-  )
+  );
 }

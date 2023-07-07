@@ -1,11 +1,11 @@
-import { Home } from '../../components/Home';
+import { Home } from "../../components/Home";
 
-export { Page }
+export { Page };
 
 function Page() {
   return (
     <>
       <Home />
     </>
-  )
+  );
 }
