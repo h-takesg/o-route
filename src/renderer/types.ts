@@ -15,7 +15,6 @@ type PageProps = Record<string, unknown>;
 export type PageContextCustom = {
   Page: Page;
   pageProps?: PageProps;
-  urlPathname: string;
   exports: {
     documentProps?: {
       title?: string;
