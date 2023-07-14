@@ -26,6 +26,7 @@ async function render(pageContext: PageContextBuiltIn) {
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title>o-route</title>
+        <meta name="description" content="オリエンテーリングの地図読みに使えるオンラインホワイトボード"/>
       </head>
       <body>
         <div id="root">${dangerouslySkipEscape(pageHtml)}</div>
