@@ -1,16 +1,8 @@
-import React from "react";
 import "./PageShell.css";
+import { ReactNode, StrictMode} from "react";
 
 export { PageShell };
 
-function PageShell({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  return (
-    <React.StrictMode>
-      {children}
-    </React.StrictMode>
-  );
+function PageShell({ children }: { children: ReactNode }) {
+  return <StrictMode>{children}</StrictMode>;
 }
