@@ -8,11 +8,11 @@ import type { PageContextClient } from "./types";
 
 let root: Root;
 async function render(pageContext: PageContextClient) {
-  const { Page, pageProps } = pageContext;
+  const { Page } = pageContext;
 
   const page = (
-    <PageShell pageContext={pageContext}>
-      <Page {...pageProps} />
+    <PageShell>
+      <Page />
     </PageShell>
   );
 

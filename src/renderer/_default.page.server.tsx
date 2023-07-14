@@ -1,6 +1,4 @@
 export { render };
-// See https://vite-plugin-ssr.com/data-fetching
-export const passToClient = ["pageProps"];
 
 import ReactDOMServer from "react-dom/server";
 import { PageShell } from "./PageShell";
@@ -12,7 +10,7 @@ async function render(pageContext: PageContextBuiltIn) {
   let pageHtml;
   if (pageContext.Page) {
     pageHtml = ReactDOMServer.renderToString(
-      <PageShell pageContext={pageContext}>
+      <PageShell>
         <Page />
       </PageShell>,
     );
