@@ -4,10 +4,13 @@ export const hydrationCanBeAborted = true;
 
 import { Root, createRoot, hydrateRoot } from "react-dom/client";
 import { PageShell } from "./PageShell";
-import type { PageContextBuiltInClientWithClientRouting } from "vite-plugin-ssr/types";
+import type { PageContextBuiltInClientWithClientRouting } from "vike/types";
+import { ElementType } from "react";
 
 let root: Root;
-async function render(pageContext: PageContextBuiltInClientWithClientRouting) {
+async function render(
+  pageContext: PageContextBuiltInClientWithClientRouting<ElementType>,
+) {
   const { Page } = pageContext;
 
   const page = (
@@ -18,7 +21,7 @@ async function render(pageContext: PageContextBuiltInClientWithClientRouting) {
 
   const container = document.getElementById("root");
   if (container === null) return;
-  
+
   // 初遷移でcsrページである or client side routingである
   if (container?.innerHTML === "" || !pageContext.isHydration) {
     if (!root) {

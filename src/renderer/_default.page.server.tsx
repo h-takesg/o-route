@@ -2,8 +2,8 @@ export { render };
 
 import { renderToString } from "react-dom/server";
 import { PageShell } from "./PageShell";
-import { escapeInject, dangerouslySkipEscape } from "vite-plugin-ssr/server";
-import type { PageContextBuiltIn } from "vite-plugin-ssr/types";
+import { escapeInject, dangerouslySkipEscape } from "vike/server";
+import type { PageContextBuiltIn } from "vike/types";
 
 async function render(pageContext: PageContextBuiltIn) {
   const { Page } = pageContext;

@@ -1,5 +1,5 @@
 import "./PageShell.css";
-import { ReactNode, StrictMode} from "react";
+import { ReactNode, StrictMode } from "react";
 
 export { PageShell };
 

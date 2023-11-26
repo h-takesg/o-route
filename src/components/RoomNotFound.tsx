@@ -1,5 +1,5 @@
 import { Button } from "@mui/material";
-import { navigate } from "vite-plugin-ssr/client/router";
+import { navigate } from "vike/client/router";
 
 function RoomNotFound() {
   const gotoHome = () => {

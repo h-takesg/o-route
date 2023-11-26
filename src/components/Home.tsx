@@ -1,5 +1,5 @@
 import { Card, CardContent, Typography } from "@mui/material";
-import { navigate } from "vite-plugin-ssr/client/router";
+import { navigate } from "vike/client/router";
 import { useDatabaseRef } from "../hooks/useDatabaseRef";
 import { push, serverTimestamp } from "firebase/database";
 import Markdown from "marked-react";

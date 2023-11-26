@@ -18,7 +18,7 @@ import {
 } from "firebase/database";
 import { getDownloadURL, getStorage, ref, uploadBytes } from "firebase/storage";
 import { useDatabaseRef } from "../hooks/useDatabaseRef";
-import { navigate } from "vite-plugin-ssr/client/router";
+import { navigate } from "vike/client/router";
 import { Mode, ViewMode } from "../types";
 import { DrawLine, Lines } from "../models/LineModel";
 import { Point, Vector } from "../math";
