@@ -89,7 +89,8 @@ function Canvas({
           ? event.evt.pageY
           : event.evt.touches[0].pageY,
     });
-    const pointerOnGroup = group.getRelativePointerPosition();
+    // eventが発生しているためPointerPositionは必ず値を持つ
+    const pointerOnGroup = group.getRelativePointerPosition()!;
 
     switch (mode) {
       case "move":
