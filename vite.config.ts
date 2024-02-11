@@ -13,4 +13,7 @@ export default defineConfig({
       usePolling: true
     }
   },
+  ssr: {
+    noExternal: [ "react-icons" ]
+  }
 });

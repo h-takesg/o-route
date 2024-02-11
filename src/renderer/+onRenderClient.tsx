@@ -2,12 +2,11 @@ export { render as onRenderClient };
 
 import { Root, createRoot, hydrateRoot } from "react-dom/client";
 import { PageShell } from "./PageShell";
-import type { PageContextBuiltInClientWithClientRouting } from "vike/types";
-import { ElementType } from "react";
+import type { PageContextClient } from "vike/types";
 
 let root: Root;
 async function render(
-  pageContext: PageContextBuiltInClientWithClientRouting<ElementType>,
+  pageContext: PageContextClient,
 ) {
   const { Page } = pageContext;
 

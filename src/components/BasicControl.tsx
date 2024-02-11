@@ -3,10 +3,10 @@ import {
   ToggleButton,
   ToggleButtonGroup,
 } from "@mui/material";
-import OpenWithIcon from "@mui/icons-material/OpenWith";
-import ModeIcon from "@mui/icons-material/Mode";
-import ClearIcon from "@mui/icons-material/Clear";
-import ImageIcon from "@mui/icons-material/Image";
+import OpenWithIcon_ from "@mui/icons-material/OpenWith";
+import ModeIcon_ from "@mui/icons-material/Mode";
+import ClearIcon_ from "@mui/icons-material/Clear";
+import ImageIcon_ from "@mui/icons-material/Image";
 import { FaEraser } from "react-icons/fa";
 import React, {
   ChangeEvent,
@@ -16,6 +16,20 @@ import React, {
   useState,
 } from "react";
 import { Mode } from "../types";
+
+// https://github.com/mui/material-ui/issues/37375
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+const OpenWithIcon: typeof OpenWithIcon_ = OpenWithIcon_.default ?? OpenWithIcon_;
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+const ModeIcon: typeof ModeIcon_ = ModeIcon_.default ?? ModeIcon_;
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+const ClearIcon: typeof ClearIcon_ = ClearIcon_.default ?? ClearIcon_;
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+const ImageIcon: typeof ImageIcon_ = ImageIcon_.default ?? ImageIcon_;
 
 type Props = {
   mode: Mode;

@@ -1,23 +1,8 @@
 export { render as onRenderHtml };
 
-import { renderToString } from "react-dom/server";
-import { PageShell } from "./PageShell";
-import { escapeInject, dangerouslySkipEscape } from "vike/server";
-import type { PageContextServer } from "vike/types";
+import { escapeInject } from "vike/server";
 
-async function render(pageContext: PageContextServer) {
-  const { Page } = pageContext;
-  let pageHtml;
-  if (Page) {
-    pageHtml = renderToString(
-      <PageShell>
-        <Page />
-      </PageShell>,
-    );
-  } else {
-    pageHtml = "";
-  }
-
+async function render() {
   return escapeInject`<!DOCTYPE html>
     <html lang="ja">
       <head>
@@ -35,7 +20,7 @@ async function render(pageContext: PageContextServer) {
         <meta name="description" content="オリエンテーリングの地図読みに使えるオンラインホワイトボード．読み込んだ画像を回転させながらルートを書き込めます．"/>
       </head>
       <body>
-        <div id="root">${dangerouslySkipEscape(pageHtml)}</div>
+        <div id="root">loading...</div>
       </body>
     </html>`;
 }
