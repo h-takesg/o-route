@@ -1,6 +1,4 @@
-export { render };
-export const clientRouting = true;
-export const hydrationCanBeAborted = true;
+export { render as onRenderClient };
 
 import { Root, createRoot, hydrateRoot } from "react-dom/client";
 import { PageShell } from "./PageShell";

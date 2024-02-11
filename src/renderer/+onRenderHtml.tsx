@@ -1,4 +1,4 @@
-export { render };
+export { render as onRenderHtml };
 
 import { renderToString } from "react-dom/server";
 import { PageShell } from "./PageShell";
