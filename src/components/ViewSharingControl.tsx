@@ -1,8 +1,16 @@
 import { ToggleButton, ToggleButtonGroup } from "@mui/material";
-import Person from "@mui/icons-material/Person";
+import Person_ from "@mui/icons-material/Person";
 import { FaChessKing } from "react-icons/fa";
-import People from "@mui/icons-material/People";
+import People_ from "@mui/icons-material/People";
 import { ViewMode } from "../types";
+
+// https://github.com/mui/material-ui/issues/37375
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+const Person: typeof Person_ = Person_.default ?? Person_;
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+const People: typeof People_ = People_.default ?? People_;
 
 type Props = {
   viewMode: ViewMode;

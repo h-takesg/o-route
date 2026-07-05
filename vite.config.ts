@@ -6,7 +6,7 @@ import ssr from "vike/plugin";
 export default defineConfig({
   plugins: [
     react(),
-    ssr({ prerender: true })
+    ssr()
   ],
   server: {
     watch: {
