@@ -22,6 +22,7 @@ React 18 + TypeScript (strict) + Vike SSR + Konva + Immutable.js + Firebase RTDB
 
 - Small branches; one concern per branch
 - After changes: `npm run format` then `npm run build`
+- UI / canvas / online changes: also run `npm run test:e2e` (or `npm run verify`)
 - Do not merge to `master` without user approval
 
 ## Avoid

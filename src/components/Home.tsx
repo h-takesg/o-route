@@ -49,6 +49,7 @@ function Home() {
         }}
       >
         <Card
+          data-testid="enter-local"
           sx={{
             width: "45%",
             margin: "1rem auto",
@@ -76,6 +77,7 @@ function Home() {
           </CardContent>
         </Card>
         <Card
+          data-testid="enter-online"
           sx={{
             width: "45%",
             margin: "1rem auto",

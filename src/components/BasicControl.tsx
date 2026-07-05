@@ -88,18 +88,19 @@ function BasicControl({ mode, setMode, setImage, clearAllLines }: Props) {
         }}
         onChange={handleModeChange}
       >
-        <ToggleButton value="move">
+        <ToggleButton value="move" data-testid="mode-move">
           <OpenWithIcon fontSize="large" />
         </ToggleButton>
-        <ToggleButton value="draw">
+        <ToggleButton value="draw" data-testid="mode-draw">
           <ModeIcon fontSize="large" />
         </ToggleButton>
-        <ToggleButton value="erase">
+        <ToggleButton value="erase" data-testid="mode-erase">
           <FaEraser style={{ fontSize: "1.7rem" }} />
         </ToggleButton>
       </ToggleButtonGroup>
       <ToggleButton
         value="allclear"
+        data-testid="clear-all"
         sx={{
           background: "white",
           margin: "0 1rem",
@@ -114,6 +115,7 @@ function BasicControl({ mode, setMode, setImage, clearAllLines }: Props) {
       </ToggleButton>
       <ToggleButton
         value="load"
+        data-testid="load-image"
         sx={{
           background: "white",
           margin: "1rem",

@@ -1,0 +1,53 @@
+---
+description: E2E and UI verification workflow for agents
+alwaysApply: true
+---
+
+# E2E Verification
+
+Use automated checks before reporting UI/canvas/online work as done.
+
+## Commands
+
+| Command | When |
+|---------|------|
+| `npm run test:unit` | Logic/model changes only |
+| `npm run test:e2e` | UI, canvas, routing, Firebase online flows |
+| `npm run verify` | Full agent check: format + unit + e2e + build |
+
+## Selectors
+
+Prefer stable `data-testid` attributes:
+
+- `enter-local`, `enter-online` — home mode cards
+- `mode-move`, `mode-draw`, `mode-erase` — toolbar modes
+- `clear-all`, `load-image` — toolbar actions
+- `canvas-stage` — Konva canvas wrapper
+
+Reuse helpers in `e2e/helpers.ts` (`goToLocalMode`, `drawStrokeOnCanvas`, etc.).
+
+## Online tests
+
+E2E starts Firebase Emulator automatically via `npm run e2e:server` (Playwright `webServer`), or reuses a healthy dev server on port 3000.
+
+Online rooms are created through the Emulator REST API (`e2e/helpers.ts`) for stable, headless setup. Home-card click flows are covered indirectly via `/local` navigation and API room creation.
+
+First-time setup in Dev Container:
+
+```bash
+npm run test:e2e:install
+sudo env "PATH=$PATH" npx playwright install-deps chromium
+```
+
+## Failure artifacts
+
+On failure, inspect:
+
+- `playwright-report/index.html` — HTML report
+- `test-results/` — screenshots and traces
+
+## Scope guidance
+
+- Canvas drawing: verify mode switch + stroke via `canvasHasRedStroke`
+- Online room: use `enter-online` (creates room via Emulator), not production Firebase
+- Do not rely on browser MCP alone when `npm run test:e2e` can cover the flow

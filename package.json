@@ -8,9 +8,16 @@
     "build": "tsc && vite build",
     "preview": "vite preview --host",
     "format": "eslint src --fix && prettier --write src",
-    "test": "vitest run",
+    "test": "npm run test:unit",
+    "test:unit": "vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report",
+    "test:e2e:install": "playwright install chromium",
+    "verify": "npm run format && npm run test:unit && npm run test:e2e && npm run build",
     "emulators": "firebase emulators:start --only database,storage",
-    "dev:emulator": "firebase emulators:exec --only database,storage --ui 'VITE_USE_FIREBASE_EMULATOR=true npm run dev'"
+    "dev:emulator": "firebase emulators:exec --only database,storage --ui 'VITE_USE_FIREBASE_EMULATOR=true npm run dev'",
+    "e2e:server": "firebase emulators:exec --only database,storage 'VITE_USE_FIREBASE_EMULATOR=true vite --host --port 3000'"
   },
   "dependencies": {
     "@emotion/react": "^11.10.6",
@@ -28,6 +35,7 @@
     "use-image": "^1.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.49.1",
     "@types/react": "^18.0.28",
     "@types/react-dom": "^18.0.11",
     "@typescript-eslint/eslint-plugin": "^6.0.0",

@@ -16,10 +16,9 @@
 
 	"workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/${localWorkspaceFolderBasename},type=bind,consistency=delegate",
 
-	"forwardPorts": [3000, 4000, 9000, 9199]
+	"forwardPorts": [3000, 4000, 9000, 9199],
 
-	// Use 'postCreateCommand' to run commands after the container is created.
-	// "postCreateCommand": "uname -a",
+	"postCreateCommand": "npm install && npm run test:e2e:install && sudo env \"PATH=$PATH\" npx playwright install-deps chromium"
 
 	// Configure tool-specific properties.
 	// "customizations": {},

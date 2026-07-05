@@ -270,7 +270,7 @@ function Canvas({
   };
 
   return (
-    <>
+    <div data-testid="canvas-stage">
       <Stage height={height} width={width} ref={stageRef}>
         <Layer>
           <Group
@@ -312,7 +312,7 @@ function Canvas({
           </Group>
         </Layer>
       </Stage>
-    </>
+    </div>
   );
 }
 
