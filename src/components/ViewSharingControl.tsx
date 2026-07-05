@@ -10,10 +10,7 @@ type Props = {
 };
 
 function ViewSharingControl({ viewMode, setViewMode }: Props) {
-  const handleModeChange = (
-    event: React.MouseEvent<HTMLElement>,
-    nextView: ViewMode,
-  ) => {
+  const handleModeChange = (event: React.MouseEvent<HTMLElement>, nextView: ViewMode) => {
     if (nextView !== null) {
       setViewMode(nextView);
     }

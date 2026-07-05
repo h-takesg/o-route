@@ -13,9 +13,7 @@ class ViewModel extends _ViewModelBase {
   }
 
   scaleAt(center: VectorValue, scale: number, min = 0, max = Infinity) {
-    const oldCenterToPosition = this.position
-      .getSub(center)
-      .getScaled(1 / this.scale);
+    const oldCenterToPosition = this.position.getSub(center).getScaled(1 / this.scale);
     const newScale = clamp(min, this.scale * scale, max);
     const newCenterToPosition = oldCenterToPosition.getScaled(newScale);
     const newPosition = newCenterToPosition.getAdd(center);

@@ -45,11 +45,7 @@ function useViewSharing(
     id: myViewLeaderId.current,
     center: viewModelRef.current.position
       .getReverse()
-      .getAdd(
-        new Vector({ x: widthRef.current, y: heightRef.current }).getScaled(
-          1 / 2,
-        ),
-      )
+      .getAdd(new Vector({ x: widthRef.current, y: heightRef.current }).getScaled(1 / 2))
       .getScaled(1 / viewModelRef.current.scale)
       .getRotated(-viewModelRef.current.rotation),
     area: {
@@ -62,16 +58,14 @@ function useViewSharing(
   useEffect(() => {
     switch (viewMode) {
       case "single":
-        if (viewSyncTimer.current !== null)
-          clearInterval(viewSyncTimer.current);
+        if (viewSyncTimer.current !== null) clearInterval(viewSyncTimer.current);
         off(viewRef);
         off(child(viewRef, "id"));
         myViewLeaderId.current = "";
         break;
 
       case "follwer":
-        if (viewSyncTimer.current !== null)
-          clearInterval(viewSyncTimer.current);
+        if (viewSyncTimer.current !== null) clearInterval(viewSyncTimer.current);
         off(child(viewRef, "id"));
         myViewLeaderId.current = "";
 
@@ -81,9 +75,9 @@ function useViewSharing(
             snapshot.child("area").child("width").val(),
             snapshot.child("area").child("height").val(),
           );
-          const newCenterOnGroupRotated = new Vector(
-            snapshot.child("center").val(),
-          ).getRotated(newRotation);
+          const newCenterOnGroupRotated = new Vector(snapshot.child("center").val()).getRotated(
+            newRotation,
+          );
           const centerOnStage = new Vector({
             x: widthRef.current,
             y: heightRef.current,

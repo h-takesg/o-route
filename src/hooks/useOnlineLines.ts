@@ -43,10 +43,7 @@ function useOnlineLines(roomId: string) {
             console.error("incoming new line key is null");
             return oldLines;
           }
-          return oldLines.updateTimestamp(
-            snapshot.key,
-            snapshot.child("timestamp").val(),
-          );
+          return oldLines.updateTimestamp(snapshot.key, snapshot.child("timestamp").val());
         });
       } else {
         // 他人の線
@@ -56,27 +53,18 @@ function useOnlineLines(roomId: string) {
             console.error("incoming new line key is null");
             return oldLines;
           }
-          return oldLines.addLineWithKey(
-            snapshot.key,
-            DrawLine.of(snapshot.val()),
-          );
+          return oldLines.addLineWithKey(snapshot.key, DrawLine.of(snapshot.val()));
         });
 
         // 自分以外の線でかつ描き込み中なら以降の更新をlistenする
         if (snapshot.val().isDrawing) {
-          onChildAdded(
-            child(linesRef, `${snapshot.key}/points`),
-            addNewPointFactory(snapshot.key),
-          );
-          onValue(
-            child(linesRef, `${snapshot.key}/isDrawing`),
-            (snapshotIsDrawing) => {
-              if (!snapshotIsDrawing.val()) {
-                off(child(linesRef, `${snapshot.key}/isDrawing`));
-                off(child(linesRef, `${snapshot.key}/points`));
-              }
-            },
-          );
+          onChildAdded(child(linesRef, `${snapshot.key}/points`), addNewPointFactory(snapshot.key));
+          onValue(child(linesRef, `${snapshot.key}/isDrawing`), (snapshotIsDrawing) => {
+            if (!snapshotIsDrawing.val()) {
+              off(child(linesRef, `${snapshot.key}/isDrawing`));
+              off(child(linesRef, `${snapshot.key}/points`));
+            }
+          });
         }
       }
     });

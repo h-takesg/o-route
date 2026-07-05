@@ -44,8 +44,7 @@ class DrawLine extends DrawLineBase {
   private getPoint(index: number): Point | undefined {
     const v0 = this.points.get(index * 2);
     const v1 = this.points.get(index * 2 + 1);
-    if (typeof v0 === "undefined" || typeof v1 === "undefined")
-      return undefined;
+    if (typeof v0 === "undefined" || typeof v1 === "undefined") return undefined;
     return { x: v0, y: v1 };
   }
 }

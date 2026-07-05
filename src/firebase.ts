@@ -5,8 +5,7 @@ import { connectStorageEmulator, getStorage } from "firebase/storage";
 const firebaseConfig = {
   apiKey: "AIzaSyCs6u1FqePbYk1b5dx8NcICCH7Xc8zUjBg",
   authDomain: "o-route.firebaseapp.com",
-  databaseURL:
-    "https://o-route-default-rtdb.asia-southeast1.firebasedatabase.app",
+  databaseURL: "https://o-route-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "o-route",
   storageBucket: "o-route.appspot.com",
   messagingSenderId: "110047467361",
@@ -24,16 +23,8 @@ function connectFirebaseEmulators() {
     return;
   }
 
-  connectDatabaseEmulator(
-    getDatabase(firebaseApp),
-    EMULATOR_HOST,
-    EMULATOR_DATABASE_PORT,
-  );
-  connectStorageEmulator(
-    getStorage(firebaseApp),
-    EMULATOR_HOST,
-    EMULATOR_STORAGE_PORT,
-  );
+  connectDatabaseEmulator(getDatabase(firebaseApp), EMULATOR_HOST, EMULATOR_DATABASE_PORT);
+  connectStorageEmulator(getStorage(firebaseApp), EMULATOR_HOST, EMULATOR_STORAGE_PORT);
   emulatorsConnected = true;
 }
 

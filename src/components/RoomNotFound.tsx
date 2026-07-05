@@ -17,11 +17,7 @@ function RoomNotFound() {
       <h1 style={{ color: "#ff3333" }}>ルームが見つかりませんでした</h1>
       <p>URLが間違っているかルームの有効期限が切れているかもしれません．</p>
       <div style={{ width: "100%" }}>
-        <Button
-          variant="contained"
-          style={{ margin: "0 auto" }}
-          onClick={gotoHome}
-        >
+        <Button variant="contained" style={{ margin: "0 auto" }} onClick={gotoHome}>
           Home
         </Button>
       </div>

@@ -5,9 +5,7 @@ import { PageShell } from "./PageShell";
 import type { PageContextClient } from "vike/types";
 
 let root: Root;
-async function render(
-  pageContext: PageContextClient,
-) {
+async function render(pageContext: PageContextClient) {
   const { Page } = pageContext;
 
   const page = (

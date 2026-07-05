@@ -53,10 +53,7 @@ describe("ViewModel", () => {
   });
 
   it("setters return new instances with updated fields", () => {
-    const viewModel = new ViewModel()
-      .setPosition({ x: 3, y: 4 })
-      .setScale(2)
-      .setRotation(45);
+    const viewModel = new ViewModel().setPosition({ x: 3, y: 4 }).setScale(2).setRotation(45);
 
     expect(viewModel.position.x).toBe(3);
     expect(viewModel.position.y).toBe(4);

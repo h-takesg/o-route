@@ -21,9 +21,7 @@ describe("DrawLine", () => {
   });
 
   it("isCrossing detects intersection with an eraser segment", () => {
-    const line = new DrawLine()
-      .addPoint({ x: 0, y: 0 })
-      .addPoint({ x: 10, y: 10 });
+    const line = new DrawLine().addPoint({ x: 0, y: 0 }).addPoint({ x: 10, y: 10 });
 
     expect(line.isCrossing({ x: 0, y: 10 }, { x: 10, y: 0 })).toBe(true);
     expect(line.isCrossing({ x: 20, y: 20 }, { x: 30, y: 30 })).toBe(false);
@@ -81,28 +79,18 @@ describe("Lines", () => {
   });
 
   it("getLength returns the number of stored coordinates", () => {
-    const [lines, key] = new Lines().addLine(
-      new DrawLine().addPoint({ x: 1, y: 2 }),
-    );
+    const [lines, key] = new Lines().addLine(new DrawLine().addPoint({ x: 1, y: 2 }));
 
     expect(lines.getLength(key)).toBe(2);
   });
 
   it("getCrossingLine returns keys of lines crossed by a segment", () => {
-    const crossing = new DrawLine()
-      .addPoint({ x: 0, y: 0 })
-      .addPoint({ x: 10, y: 10 });
-    const safe = new DrawLine()
-      .addPoint({ x: 20, y: 0 })
-      .addPoint({ x: 30, y: 0 });
+    const crossing = new DrawLine().addPoint({ x: 0, y: 0 }).addPoint({ x: 10, y: 10 });
+    const safe = new DrawLine().addPoint({ x: 20, y: 0 }).addPoint({ x: 30, y: 0 });
 
-    const lines = new Lines()
-      .addLineWithKey("a", crossing)
-      .addLineWithKey("b", safe);
+    const lines = new Lines().addLineWithKey("a", crossing).addLineWithKey("b", safe);
 
-    expect(lines.getCrossingLine({ x: 0, y: 10 }, { x: 10, y: 0 })).toEqual([
-      "a",
-    ]);
+    expect(lines.getCrossingLine({ x: 0, y: 10 }, { x: 10, y: 0 })).toEqual(["a"]);
   });
 
   it("removeLine deletes the specified keys", () => {

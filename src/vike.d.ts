@@ -1,9 +1,9 @@
 declare global {
   namespace Vike {
     interface PageContext {
-      Page: () => JSX.Element
+      Page: () => JSX.Element;
     }
   }
 }
 
-export {}
+export {};

@@ -1,20 +1,10 @@
-import {
-  CircularProgress,
-  ToggleButton,
-  ToggleButtonGroup,
-} from "@mui/material";
+import { CircularProgress, ToggleButton, ToggleButtonGroup } from "@mui/material";
 import OpenWithIcon_ from "@mui/icons-material/OpenWith";
 import ModeIcon_ from "@mui/icons-material/Mode";
 import ClearIcon_ from "@mui/icons-material/Clear";
 import ImageIcon_ from "@mui/icons-material/Image";
 import { FaEraser } from "react-icons/fa";
-import React, {
-  ChangeEvent,
-  Dispatch,
-  SetStateAction,
-  useRef,
-  useState,
-} from "react";
+import React, { ChangeEvent, Dispatch, SetStateAction, useRef, useState } from "react";
 import { Mode } from "../types";
 
 // https://github.com/mui/material-ui/issues/37375
@@ -42,10 +32,7 @@ function BasicControl({ mode, setMode, setImage, clearAllLines }: Props) {
   const imageSelectButtonRef = useRef<HTMLInputElement>(null);
   const [isImageUploading, setIsImageUploading] = useState(false);
 
-  const handleModeChange = (
-    event: React.MouseEvent<HTMLElement>,
-    nextView: Mode,
-  ) => {
+  const handleModeChange = (event: React.MouseEvent<HTMLElement>, nextView: Mode) => {
     if (nextView !== null) {
       setMode(nextView);
     }

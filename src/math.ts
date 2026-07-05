@@ -2,10 +2,7 @@ export type VectorValue = { x: number; y: number };
 export type Point = VectorValue;
 export type LineSegment = [Point, Point];
 
-export const intersectsLineSegment = (
-  l1: LineSegment,
-  l2: LineSegment,
-): boolean => {
+export const intersectsLineSegment = (l1: LineSegment, l2: LineSegment): boolean => {
   const [p1, p2] = l1,
     [p3, p4] = l2;
   const { x: x1, y: y1 } = p1,
@@ -25,8 +22,7 @@ export const intersectsLineSegment = (
   return t >= 0 && t <= 1 && u >= 0 && u <= 1;
 };
 
-export const clamp = (min: number, x: number, max: number) =>
-  Math.max(min, Math.min(x, max));
+export const clamp = (min: number, x: number, max: number) => Math.max(min, Math.min(x, max));
 export const closestToZero = (...data: number[]) =>
   data.sort((a, b) => Math.abs(a) - Math.abs(b))[0];
 
