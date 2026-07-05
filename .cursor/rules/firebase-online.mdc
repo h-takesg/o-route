@@ -1,0 +1,32 @@
+---
+description: Firebase sync and OnlineCanvas cautions
+globs: src/components/OnlineCanvas.tsx,src/firebase.ts,database.rules.json,storage.rules
+alwaysApply: false
+---
+
+# Firebase / Online Sync
+
+## Data paths
+
+```
+rooms/{roomId}/timestamp | image | lines/{id}/points,isDrawing,timestamp | view/
+```
+
+## Patterns
+
+- DB refs via `useDatabaseRef` (created once per mount)
+- Drawing: local `setLines` + remote `set`/`update` on `points` indices
+- Image: Storage `uploadBytes` → `getDownloadURL` → RTDB `image`
+
+## Hotspot
+
+`OnlineCanvas.tsx` (~330 lines) centralizes sync and view sharing. Change with care.
+
+## Known issues (verify before fixing)
+
+- Line 161: `Object.keys(lines)` is wrong for Immutable `Lines`; stale closure in `useEffect([])`
+- View mode typo `"follwer"` is intentional until migration plan exists
+
+## Security
+
+No auth. Do not widen `database.rules.json` or `storage.rules`.

@@ -1,0 +1,27 @@
+---
+description: Immutable.js patterns for ViewModel and Lines
+globs: src/models/**/*
+alwaysApply: false
+---
+
+# Immutable Models
+
+`ViewModel`, `DrawLine`, `Lines` extend Immutable `Record`. Never mutate in place.
+
+```typescript
+// BAD
+line.points.push(x);
+
+// GOOD
+return this.set("points", this.points.push(x));
+```
+
+## Line keys
+
+- Local mode: sequential strings (`"0"`, `"1"`, ...)
+- Online mode: Firebase `push()` keys
+
+## Related files
+
+- Canvas/view: `ViewModel.ts` — `move`, `scaleAt`, `rotateAt`
+- Drawing/erase: `LineModel.ts` — `getCrossingLine` deletes whole lines on intersection

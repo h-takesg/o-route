@@ -1,0 +1,33 @@
+---
+description: O-Route core conventions and change workflow
+alwaysApply: true
+---
+
+# O-Route Core
+
+Read `AGENTS.md` for full context before non-trivial changes.
+
+## Stack
+
+React 18 + TypeScript (strict) + Vike SSR + Konva + Immutable.js + Firebase RTDB/Storage.
+
+## Code style
+
+- Function components only: `function Foo()` with `export { Foo }`
+- Named exports only (except Vike `+config.h.ts` default export)
+- Props: `type Props = { ... }` in the same file
+- UI: MUI + `Overlay` / `ToggleButton` on canvas screens
+
+## Change workflow
+
+- Small branches; one concern per branch
+- After changes: `npm run format` then `npm run build`
+- Do not merge to `master` without user approval
+
+## Avoid
+
+- Mutating Immutable `Record` instances in place
+- Loosening Firebase security rules
+- Renaming `"follwer"` without backward compatibility
+- Casual edits to `OnlineCanvas.tsx` useEffect dependency arrays
+- Over-abstracting for this ~1,600-line codebase

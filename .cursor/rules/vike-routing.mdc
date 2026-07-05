@@ -1,0 +1,32 @@
+---
+description: Vike page and SSR conventions
+globs: src/pages/**/*,src/renderer/**/*
+alwaysApply: false
+---
+
+# Vike / SSR
+
+## New pages
+
+Add `src/pages/<route>/+Page.tsx`:
+
+```typescript
+export { Page };
+
+function Page() {
+  return <MyComponent />;
+}
+```
+
+## Client-only APIs
+
+`window`, Firebase listeners → `useEffect` or CSR-only pages (e.g. `/online`).
+
+## Config
+
+- `src/renderer/+config.h.ts`: `clientRouting: true`
+- `react-icons` needs `ssr.noExternal` in `vite.config.ts`
+
+## Custom HTML
+
+Only `/online` has page-level `+onRenderHtml.tsx` for SEO meta.
