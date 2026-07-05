@@ -12,7 +12,21 @@ export const intersectsLineSegment = (l1: LineSegment, l2: LineSegment): boolean
 
   const D = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
   if (D === 0) {
-    return false;
+    const onSegment = (p: Point, a: Point, b: Point) => {
+      return (
+        Math.min(a.x, b.x) <= p.x &&
+        p.x <= Math.max(a.x, b.x) &&
+        Math.min(a.y, b.y) <= p.y &&
+        p.y <= Math.max(a.y, b.y)
+      );
+    };
+
+    return (
+      onSegment(p1, p3, p4) ||
+      onSegment(p2, p3, p4) ||
+      onSegment(p3, p1, p2) ||
+      onSegment(p4, p1, p2)
+    );
   }
 
   const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / D;

@@ -3,7 +3,6 @@ import {
   DataSnapshot,
   DatabaseReference,
   child,
-  off,
   onChildAdded,
   onChildRemoved,
   onValue,
@@ -21,69 +20,111 @@ import { useDatabaseRef } from "./useDatabaseRef";
 function useOnlineLines(roomId: string) {
   const linesRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/lines`);
   const drawingLineRef = useRef<DatabaseReference | null>(null);
+  const ownLineKeysRef = useRef<Set<string>>(new Set());
+  const suppressedLineKeysRef = useRef<Set<string>>(new Set());
+  const drawingPointCountRef = useRef<Map<string, number>>(new Map());
+  const initialLineWriteRef = useRef<Map<string, Promise<void>>>(new Map());
   const [lines, setLines] = useState(new Lines());
+  const linesStateRef = useRef(lines);
+
+  const commitLines = (updater: (oldLines: Lines) => Lines) => {
+    setLines((oldLines) => {
+      const next = updater(oldLines);
+      linesStateRef.current = next;
+      return next;
+    });
+  };
+
+  const afterInitialLineWrite = (key: string, write: () => void | Promise<void>) => {
+    const initialWrite = initialLineWriteRef.current.get(key) ?? Promise.resolve();
+    void initialWrite.then(write).catch((error) => {
+      console.error("firebase line write failed", error);
+    });
+  };
+
+  const suppressAndRemoveFromDb = (key: string) => {
+    suppressedLineKeysRef.current.add(key);
+    ownLineKeysRef.current.delete(key);
+    drawingPointCountRef.current.delete(key);
+    initialLineWriteRef.current.delete(key);
+    remove(child(linesRef, key));
+  };
+
+  const pruneOrphanOwnLines = () => {
+    const orphans = [...ownLineKeysRef.current].filter(
+      (key) => !linesStateRef.current.lines.has(key),
+    );
+    orphans.forEach((key) => suppressAndRemoveFromDb(key));
+  };
 
   const addNewPointFactory = (lineKey: string) => {
     return (snapshot: DataSnapshot) => {
-      setLines((oldLines) => {
-        return oldLines.addValue(lineKey, snapshot.val());
-      });
+      commitLines((oldLines) => oldLines.addValue(lineKey, snapshot.val()));
     };
   };
 
   useEffect(() => {
-    onChildAdded(linesRef, (snapshot) => {
+    const lineChildUnsubs = new Map<string, (() => void)[]>();
+
+    const unsubscribeLinesAdded = onChildAdded(linesRef, (snapshot) => {
       if (snapshot.key === null) return;
 
-      if (Object.keys(lines).includes(snapshot.key)) {
-        // 自分の線 タイムスタンプをサーバー由来のもので上書きする
-        setLines((oldLines) => {
-          if (snapshot.key === null) {
-            // コールバックにつきここでも判定が必要
-            console.error("incoming new line key is null");
-            return oldLines;
-          }
-          return oldLines.updateTimestamp(snapshot.key, snapshot.child("timestamp").val());
+      if (suppressedLineKeysRef.current.has(snapshot.key)) {
+        remove(child(linesRef, snapshot.key));
+        return;
+      }
+
+      if (ownLineKeysRef.current.has(snapshot.key)) {
+        commitLines((oldLines) => {
+          if (!oldLines.lines.has(snapshot.key!)) return oldLines;
+          return oldLines.updateTimestamp(snapshot.key!, snapshot.child("timestamp").val());
         });
       } else {
-        // 他人の線
-        setLines((oldLines) => {
-          if (snapshot.key === null) {
-            // コールバックにつきここでも判定が必要
-            console.error("incoming new line key is null");
-            return oldLines;
-          }
-          return oldLines.addLineWithKey(snapshot.key, DrawLine.of(snapshot.val()));
+        commitLines((oldLines) => {
+          return oldLines.addLineWithKey(snapshot.key!, DrawLine.of(snapshot.val()));
         });
 
-        // 自分以外の線でかつ描き込み中なら以降の更新をlistenする
         if (snapshot.val().isDrawing) {
-          onChildAdded(child(linesRef, `${snapshot.key}/points`), addNewPointFactory(snapshot.key));
-          onValue(child(linesRef, `${snapshot.key}/isDrawing`), (snapshotIsDrawing) => {
+          const lineKey = snapshot.key;
+          const pointsRef = child(linesRef, `${lineKey}/points`);
+          const isDrawingRef = child(linesRef, `${lineKey}/isDrawing`);
+          const pointsUnsub = onChildAdded(pointsRef, addNewPointFactory(lineKey));
+          const isDrawingUnsub = onValue(isDrawingRef, (snapshotIsDrawing) => {
             if (!snapshotIsDrawing.val()) {
-              off(child(linesRef, `${snapshot.key}/isDrawing`));
-              off(child(linesRef, `${snapshot.key}/points`));
+              lineChildUnsubs.get(lineKey)?.forEach((unsub) => unsub());
+              lineChildUnsubs.delete(lineKey);
             }
           });
+          lineChildUnsubs.set(lineKey, [pointsUnsub, isDrawingUnsub]);
         }
       }
     });
-    onChildRemoved(linesRef, (snapshot) => {
-      setLines((oldLines) => {
+
+    const unsubscribeLinesRemoved = onChildRemoved(linesRef, (snapshot) => {
+      commitLines((oldLines) => {
         if (snapshot.key === null) return oldLines;
 
         return oldLines.removeLine(snapshot.key);
       });
     });
-    return () => off(linesRef);
-  }, []);
+
+    return () => {
+      unsubscribeLinesAdded();
+      unsubscribeLinesRemoved();
+      lineChildUnsubs.forEach((subs) => subs.forEach((unsub) => unsub()));
+      lineChildUnsubs.clear();
+    };
+  }, [linesRef]);
 
   const addPointToDrawingLine = (point: Point) => {
-    if (
-      drawingLineRef.current === null ||
-      drawingLineRef.current.key === null || // drawingLineRefが壊れているので新しい線に変える
-      !lines.lines.keySeq().includes(drawingLineRef.current.key) // 描いてた線が消されたとき
-    ) {
+    const currentDrawingRef = drawingLineRef.current;
+    const currentKey = currentDrawingRef?.key ?? null;
+    const shouldStartNewLine =
+      currentDrawingRef === null ||
+      currentKey === null ||
+      suppressedLineKeysRef.current.has(currentKey);
+
+    if (shouldStartNewLine) {
       const newLine = new DrawLine({ isDrawing: true }).addPoint(point);
       drawingLineRef.current = push(linesRef);
 
@@ -92,42 +133,83 @@ function useOnlineLines(roomId: string) {
         return;
       }
 
-      // for local
-      setLines(lines.addLineWithKey(drawingLineRef.current.key, newLine));
+      const newKey = drawingLineRef.current.key;
+      const lineRef = drawingLineRef.current;
+      ownLineKeysRef.current.add(newKey);
+      drawingPointCountRef.current.set(newKey, 2);
 
-      // for upload
+      commitLines((oldLines) => oldLines.addLineWithKey(newKey, newLine));
+
       const uploadLine = {
         ...newLine.toJS(),
         timestamp: serverTimestamp(),
       };
-      set(drawingLineRef.current, uploadLine);
-    } else {
-      const oldLength = lines.getLength(drawingLineRef.current.key);
-      if (typeof oldLength === "undefined") return;
-
-      // for local
-      setLines(lines.addPoint(drawingLineRef.current.key, point));
-
-      // for upload
-      update(child(drawingLineRef.current, "points"), {
-        [oldLength]: point.x,
-        [oldLength + 1]: point.y,
+      // 初回 set だけ直列化の起点にする。後続 update は並列で送ってよい。
+      const initialWrite = set(lineRef, uploadLine).catch((error) => {
+        console.error("firebase line write failed", error);
       });
+      initialLineWriteRef.current.set(newKey, initialWrite);
+    } else {
+      const key = currentKey;
+      const drawingRef = currentDrawingRef;
+      const pointIndex = drawingPointCountRef.current.get(key);
+      if (typeof pointIndex === "undefined") return;
+
+      drawingPointCountRef.current.set(key, pointIndex + 2);
+      commitLines((oldLines) => oldLines.addPoint(key, point));
+
+      const uploadIndex = pointIndex;
+      afterInitialLineWrite(key, () =>
+        update(child(drawingRef, "points"), {
+          [uploadIndex]: point.x,
+          [uploadIndex + 1]: point.y,
+        }),
+      );
     }
   };
 
   const endDrawing = () => {
-    if (drawingLineRef.current === null) return;
+    const ref = drawingLineRef.current;
+    if (ref === null || ref.key === null) return;
 
-    set(child(drawingLineRef.current, "isDrawing"), false);
+    const key = ref.key;
+    const initialWrite = initialLineWriteRef.current.get(key) ?? Promise.resolve();
     drawingLineRef.current = null;
+    drawingPointCountRef.current.delete(key);
+    initialLineWriteRef.current.delete(key);
+
+    if (!suppressedLineKeysRef.current.has(key) && linesStateRef.current.lines.has(key)) {
+      void initialWrite
+        .then(() => update(ref, { isDrawing: false }))
+        .catch((error) => {
+          console.error("firebase line write failed", error);
+        });
+    }
   };
 
   const removeLines = (ids: string[]) => {
-    ids.forEach((id) => remove(child(linesRef, id)));
+    if (ids.length === 0) return;
+
+    ids.forEach((id) => {
+      if (drawingLineRef.current?.key === id) {
+        drawingLineRef.current = null;
+      }
+      suppressAndRemoveFromDb(id);
+    });
+    commitLines((oldLines) => oldLines.removeLine(...ids));
+    pruneOrphanOwnLines();
   };
 
   const clearAllLines = () => {
+    drawingLineRef.current = null;
+    drawingPointCountRef.current.clear();
+    initialLineWriteRef.current.clear();
+    ownLineKeysRef.current.forEach((key) => {
+      suppressedLineKeysRef.current.add(key);
+    });
+    ownLineKeysRef.current.clear();
+    linesStateRef.current = new Lines();
+    setLines(new Lines());
     remove(linesRef);
   };
 

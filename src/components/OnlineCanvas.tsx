@@ -1,5 +1,5 @@
 import { Canvas } from "./Canvas";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LineOpacity, Mode, ViewMode } from "../types";
 import { Overlay } from "./Overlay";
 import { BasicControl } from "./BasicControl";
@@ -22,9 +22,15 @@ function OnlineCanvas({ roomId }: Props) {
   const [viewModel, setViewModel] = useState(new ViewModel());
   const [lineOpacity, setLineOpacity] = useState<LineOpacity>("opaque");
 
-  const { imageUrl, setImage } = useOnlineRoomImage(roomId);
+  const { imageUrl, setImage, uploadError, clearUploadError } = useOnlineRoomImage(roomId);
   const { lines, addPointToDrawingLine, endDrawing, removeLines, clearAllLines } =
     useOnlineLines(roomId);
+
+  useEffect(() => {
+    if (uploadError === null) return;
+    alert(uploadError);
+    clearUploadError();
+  }, [uploadError, clearUploadError]);
 
   useViewSharing(roomId, viewMode, setViewMode, viewModel, setViewModel, width, height);
 

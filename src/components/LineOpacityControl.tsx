@@ -12,8 +12,8 @@ const Circle: typeof Circle_ = Circle_.default ?? Circle_;
 // @ts-ignore
 const Contrast: typeof Contrast_ = Contrast_.default ?? Contrast_;
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// prettier-ignore
 // @ts-ignore
+// prettier-ignore
 const RadioButtonUnchecked: typeof RadioButtonUnchecked_ = RadioButtonUnchecked_.default ?? RadioButtonUnchecked_;
 
 type Props = {

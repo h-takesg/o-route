@@ -24,7 +24,7 @@ describe("intersectsLineSegment", () => {
     ).toBe(true);
   });
 
-  it("returns false for parallel segments", () => {
+  it("returns false when parallel segments do not overlap", () => {
     expect(
       intersectsLineSegment(
         [
@@ -37,6 +37,21 @@ describe("intersectsLineSegment", () => {
         ],
       ),
     ).toBe(false);
+  });
+
+  it("returns true when colinear segments overlap", () => {
+    expect(
+      intersectsLineSegment(
+        [
+          { x: 533, y: 360 },
+          { x: 554, y: 360 },
+        ],
+        [
+          { x: 533, y: 360 },
+          { x: 576, y: 360 },
+        ],
+      ),
+    ).toBe(true);
   });
 
   it("returns false when segments do not meet within bounds", () => {

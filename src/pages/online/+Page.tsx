@@ -1,4 +1,5 @@
 import { ReactNode, useEffect, useState } from "react";
+import { navigate } from "vike/client/router";
 
 export { Page };
 
@@ -10,7 +11,7 @@ function Page() {
     const roomId = params.get("roomId");
 
     if (roomId === null) {
-      window.location.href = "/errors/room_not_found";
+      navigate("/errors/room_not_found");
       return;
     }
 
