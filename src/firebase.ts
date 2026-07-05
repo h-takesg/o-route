@@ -28,7 +28,6 @@ function connectFirebaseEmulators() {
     getDatabase(firebaseApp),
     EMULATOR_HOST,
     EMULATOR_DATABASE_PORT,
-    { disableWarnings: true },
   );
   connectStorageEmulator(
     getStorage(firebaseApp),

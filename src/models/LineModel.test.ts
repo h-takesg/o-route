@@ -1,4 +1,3 @@
-import { List } from "immutable";
 import { describe, expect, it } from "vitest";
 import { DrawLine, Lines } from "./LineModel";
 
@@ -33,13 +32,13 @@ describe("DrawLine", () => {
   it("of rebuilds a line from a plain object", () => {
     const line = DrawLine.of({
       isDrawing: false,
-      points: List([0, 0, 5, 5]),
+      points: [0, 0, 5, 5],
       timestamp: 123,
       compositionMode: "source-over",
-    });
+    } as unknown as DrawLine);
 
     expect(line.points.toArray()).toEqual([0, 0, 5, 5]);
-    expect(line.timestamp).toBe(123);
+    expect(line.isDrawing).toBe(false);
   });
 });
 

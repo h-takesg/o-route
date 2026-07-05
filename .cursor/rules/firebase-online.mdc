@@ -34,3 +34,7 @@ No auth. Do not widen `database.rules.json` or `storage.rules`.
 ## Local development
 
 Use `npm run dev:emulator` or set `VITE_USE_FIREBASE_EMULATOR=true` with `npm run emulators`.
+
+## Local development
+
+Use `npm run dev:emulator` or set `VITE_USE_FIREBASE_EMULATOR=true` with `npm run emulators`.
