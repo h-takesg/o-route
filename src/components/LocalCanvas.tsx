@@ -1,10 +1,11 @@
 import { useRef, useState } from "react";
 import { Canvas } from "./Canvas";
 import { Point } from "../math";
-import { Mode } from "../types";
+import { LineOpacity, Mode } from "../types";
 import { Lines, DrawLine } from "../models/LineModel";
 import { Overlay } from "./Overlay";
 import { BasicControl } from "./BasicControl";
+import { LineOpacityControl } from "./LineOpacityControl";
 import { useWindowSize } from "../hooks/useWindowSize";
 import { ViewModel } from "../models/ViewModel";
 
@@ -13,6 +14,7 @@ function LocalCanvas() {
   const [mode, setMode] = useState<Mode>("move");
   const [imageUrl, setImageUrl] = useState<string>("");
   const [viewModel, setViewModel] = useState(new ViewModel());
+  const [lineOpacity, setLineOpacity] = useState<LineOpacity>("opaque");
   const drawingLineId = useRef<string | null>(null);
   const [lines, setLines] = useState(new Lines());
 
@@ -22,10 +24,7 @@ function LocalCanvas() {
   };
 
   const addPointToDrawingLine = (point: Point) => {
-    if (
-      drawingLineId.current === null ||
-      !lines.lines.keySeq().includes(drawingLineId.current)
-    ) {
+    if (drawingLineId.current === null || !lines.lines.keySeq().includes(drawingLineId.current)) {
       const newLine = new DrawLine({ isDrawing: true }).addPoint(point);
       const [newLines, newKey] = lines.addLine(newLine);
 
@@ -63,6 +62,7 @@ function LocalCanvas() {
         removeLines={removeLines}
         viewModel={viewModel}
         setViewModel={setViewModel}
+        lineOpacity={lineOpacity}
       />
       <Overlay>
         <BasicControl
@@ -71,6 +71,7 @@ function LocalCanvas() {
           setImage={setImage}
           clearAllLines={clearAllLines}
         />
+        <LineOpacityControl lineOpacity={lineOpacity} setLineOpacity={setLineOpacity} />
       </Overlay>
     </>
   );

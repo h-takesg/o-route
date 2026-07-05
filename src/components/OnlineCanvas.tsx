@@ -1,8 +1,9 @@
 import { Canvas } from "./Canvas";
 import { useState } from "react";
-import { Mode, ViewMode } from "../types";
+import { LineOpacity, Mode, ViewMode } from "../types";
 import { Overlay } from "./Overlay";
 import { BasicControl } from "./BasicControl";
+import { LineOpacityControl } from "./LineOpacityControl";
 import { ViewSharingControl } from "./ViewSharingControl";
 import { useWindowSize } from "../hooks/useWindowSize";
 import { ViewModel } from "../models/ViewModel";
@@ -19,25 +20,13 @@ function OnlineCanvas({ roomId }: Props) {
   const [mode, setMode] = useState<Mode>("move");
   const [viewMode, setViewMode] = useState<ViewMode>("single");
   const [viewModel, setViewModel] = useState(new ViewModel());
+  const [lineOpacity, setLineOpacity] = useState<LineOpacity>("opaque");
 
   const { imageUrl, setImage } = useOnlineRoomImage(roomId);
-  const {
-    lines,
-    addPointToDrawingLine,
-    endDrawing,
-    removeLines,
-    clearAllLines,
-  } = useOnlineLines(roomId);
+  const { lines, addPointToDrawingLine, endDrawing, removeLines, clearAllLines } =
+    useOnlineLines(roomId);
 
-  useViewSharing(
-    roomId,
-    viewMode,
-    setViewMode,
-    viewModel,
-    setViewModel,
-    width,
-    height,
-  );
+  useViewSharing(roomId, viewMode, setViewMode, viewModel, setViewModel, width, height);
 
   return (
     <>
@@ -52,6 +41,7 @@ function OnlineCanvas({ roomId }: Props) {
         removeLines={removeLines}
         viewModel={viewModel}
         setViewModel={setViewModel}
+        lineOpacity={lineOpacity}
       />
       <Overlay>
         <BasicControl
@@ -60,6 +50,7 @@ function OnlineCanvas({ roomId }: Props) {
           setImage={setImage}
           clearAllLines={clearAllLines}
         />
+        <LineOpacityControl lineOpacity={lineOpacity} setLineOpacity={setLineOpacity} />
         <ViewSharingControl viewMode={viewMode} setViewMode={setViewMode} />
       </Overlay>
     </>

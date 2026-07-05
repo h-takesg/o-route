@@ -1,11 +1,18 @@
 import Konva from "konva";
-import { Dispatch, SetStateAction, useRef } from "react";
+import { Dispatch, SetStateAction, useEffect, useRef } from "react";
 import { Layer, Stage, Group, Line, Rect } from "react-konva";
-import { Mode } from "../types";
+import { LineOpacity, Mode } from "../types";
 import { Lines } from "../models/LineModel";
 import { Point, Vector, closestToZero } from "../math";
 import { MapImage } from "./MapImage";
 import { ViewModel } from "../models/ViewModel";
+
+// 中間段階の具体的な不透明度はここだけで管理する（id/UI には数値を出さない）
+const LINE_OPACITY_VALUES: Record<LineOpacity, number> = {
+  transparent: 0,
+  translucent: 0.5,
+  opaque: 1,
+};
 
 type Props = {
   width: number;
@@ -18,6 +25,7 @@ type Props = {
   removeLines: (ids: string[]) => void;
   viewModel: ViewModel;
   setViewModel: Dispatch<SetStateAction<ViewModel>>;
+  lineOpacity: LineOpacity;
 };
 
 function Canvas({
@@ -31,9 +39,11 @@ function Canvas({
   removeLines,
   viewModel,
   setViewModel,
+  lineOpacity,
 }: Props) {
   const stageRef = useRef<Konva.Stage>(null);
   const groupRef = useRef<Konva.Group>(null);
+  const linesGroupRef = useRef<Konva.Group>(null);
   const pointerLastMoveTime = useRef(0);
   const HOLD_THRESHOLD = 5;
   const pointerBeforeOnStage = useRef<Vector | null>(null);
@@ -50,6 +60,19 @@ function Canvas({
   const BACKGROUND_SIZE = 80000;
   const BACKGROUND_OFFSET = (BACKGROUND_SIZE * 2) / 5;
   const BACKGROUND_COLOR = "#dddddd";
+
+  // 半透明時は線グループをキャッシュ（一度平坦化）してから不透明度を適用することで、
+  // 線同士の重なりが濃くならず、レイヤー全体として均一な透明度になる。
+  useEffect(() => {
+    const node = linesGroupRef.current;
+    if (node === null) return;
+
+    node.clearCache();
+    if (lineOpacity === "translucent" && lines.lines.size > 0) {
+      node.cache();
+    }
+    node.getLayer()?.batchDraw();
+  }, [lines, lineOpacity]);
 
   const handleMouseDown = () => {
     if (mode !== "move") return;
@@ -71,23 +94,15 @@ function Canvas({
     }
   };
 
-  const handleOnePointerMove = (
-    event: Konva.KonvaEventObject<MouseEvent | TouchEvent>,
-  ) => {
+  const handleOnePointerMove = (event: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
     if (event.evt instanceof MouseEvent && event.evt.buttons === 0) return;
 
     const group = groupRef.current;
     if (group === null) return;
 
     const pointerOnStage = new Vector({
-      x:
-        event.evt instanceof MouseEvent
-          ? event.evt.pageX
-          : event.evt.touches[0].pageX,
-      y:
-        event.evt instanceof MouseEvent
-          ? event.evt.pageY
-          : event.evt.touches[0].pageY,
+      x: event.evt instanceof MouseEvent ? event.evt.pageX : event.evt.touches[0].pageX,
+      y: event.evt instanceof MouseEvent ? event.evt.pageY : event.evt.touches[0].pageY,
     });
     // eventが発生しているためPointerPositionは必ず値を持つ
     const pointerOnGroup = group.getRelativePointerPosition()!;
@@ -109,16 +124,13 @@ function Canvas({
 
       case "erase":
         if (eraseMousemoveBeforePositionOnGroup.current !== null) {
-          const beforePoint: Point =
-            eraseMousemoveBeforePositionOnGroup.current;
+          const beforePoint: Point = eraseMousemoveBeforePositionOnGroup.current;
           const pointerPoint: Point = pointerOnGroup;
 
           const toBeRemoved = lines.getCrossingLine(beforePoint, pointerPoint);
           removeLines(toBeRemoved);
         }
-        eraseMousemoveBeforePositionOnGroup.current = new Vector(
-          pointerOnGroup,
-        );
+        eraseMousemoveBeforePositionOnGroup.current = new Vector(pointerOnGroup);
         break;
     }
   };
@@ -153,12 +165,7 @@ function Canvas({
     if (beforePointersDistance.current !== null) {
       const scale = pointersDistance / beforePointersDistance.current;
 
-      newViewModel = newViewModel.scaleAt(
-        midpoint,
-        scale,
-        SCALE_MIN,
-        SCALE_MAX,
-      );
+      newViewModel = newViewModel.scaleAt(midpoint, scale, SCALE_MIN, SCALE_MAX);
     }
     beforePointersDistance.current = pointersDistance;
 
@@ -258,12 +265,7 @@ function Canvas({
       const pointerPositionOnStage = stage.getPointerPosition();
       if (pointerPositionOnStage === null) return;
 
-      const newViewModel = viewModel.scaleAt(
-        pointerPositionOnStage,
-        scale,
-        SCALE_MIN,
-        SCALE_MAX,
-      );
+      const newViewModel = viewModel.scaleAt(pointerPositionOnStage, scale, SCALE_MIN, SCALE_MAX);
 
       setViewModel(newViewModel);
     }
@@ -296,19 +298,21 @@ function Canvas({
               fill={BACKGROUND_COLOR}
             />
             <MapImage url={imageUrl} />
-            {lines.lines.entrySeq().map(([key, line]) => {
-              return (
-                <Line
-                  key={key}
-                  id={key}
-                  points={line.points.toArray()}
-                  globalCompositeOperation={line.compositionMode}
-                  stroke="red"
-                  lineCap="round"
-                  strokeWidth={8}
-                />
-              );
-            })}
+            <Group ref={linesGroupRef} opacity={LINE_OPACITY_VALUES[lineOpacity]}>
+              {lines.lines.entrySeq().map(([key, line]) => {
+                return (
+                  <Line
+                    key={key}
+                    id={key}
+                    points={line.points.toArray()}
+                    globalCompositeOperation={line.compositionMode}
+                    stroke="red"
+                    lineCap="round"
+                    strokeWidth={8}
+                  />
+                );
+              })}
+            </Group>
           </Group>
         </Layer>
       </Stage>

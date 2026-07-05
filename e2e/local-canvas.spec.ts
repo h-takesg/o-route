@@ -45,6 +45,18 @@ test.describe("local canvas", () => {
     await expect.poll(() => canvasHasRedStroke(page)).toBe(false);
   });
 
+  test("line opacity toggle hides and restores lines", async ({ page }) => {
+    await selectMode(page, "draw");
+    await drawStrokeOnCanvas(page);
+    await expect.poll(() => canvasHasRedStroke(page)).toBe(true);
+
+    await page.getByTestId("opacity-transparent").click();
+    await expect.poll(() => canvasHasRedStroke(page)).toBe(false);
+
+    await page.getByTestId("opacity-opaque").click();
+    await expect.poll(() => canvasHasRedStroke(page)).toBe(true);
+  });
+
   test("canvas is interactive in move mode (pan)", async ({ page }) => {
     await selectMode(page, "move");
     const canvas = await waitForCanvas(page);
