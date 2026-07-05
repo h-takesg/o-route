@@ -46,5 +46,11 @@ export default defineConfig({
         command: "npm run e2e:server",
         url: BASE_URL,
         timeout: 180_000,
+        // Default is a forceful SIGKILL, which skips firebase-tools' emulator
+        // cleanup (finally-block `cleanShutdown()`) and leaves the Java-based
+        // Database/Storage Emulator processes running as orphans, blocking
+        // the port on the next run. SIGTERM lets firebase-tools shut down
+        // the emulators cleanly before Playwright escalates to SIGKILL.
+        gracefulShutdown: { signal: "SIGTERM", timeout: 10_000 },
       },
 });
