@@ -14,6 +14,7 @@ export default defineConfig({
     }
   },
   ssr: {
-    noExternal: [ "react-icons" ]
-  }
+    noExternal: ["react-icons"],
+    external: ["konva", "react-konva"],
+  },
 });

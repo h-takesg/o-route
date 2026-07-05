@@ -1,19 +1,24 @@
-import { OnlineCanvas } from "../../components/OnlineCanvas";
+import { ReactNode, useEffect, useState } from "react";
 
 export { Page };
 
 function Page() {
-  const params = new URLSearchParams(window.location.search);
-  const roomId = params.get("roomId");
+  const [content, setContent] = useState<ReactNode>(null);
 
-  if (roomId === null) {
-    window.location.href = "/errors/room_not_found";
-    return;
-  }
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const roomId = params.get("roomId");
 
-  return (
-    <>
-      <OnlineCanvas roomId={roomId} />
-    </>
-  );
+    if (roomId === null) {
+      window.location.href = "/errors/room_not_found";
+      return;
+    }
+
+    import("../../components/OnlineCanvas").then((mod) => {
+      const OnlineCanvas = mod.OnlineCanvas;
+      setContent(<OnlineCanvas roomId={roomId} />);
+    });
+  }, []);
+
+  return content;
 }
