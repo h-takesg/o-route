@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview --host",
     "format": "eslint src --fix && prettier --write src",
-    "test": "vitest run"
+    "test": "vitest run",
+    "emulators": "npx --yes firebase-tools@13.29.1 emulators:start --only database,storage",
+    "dev:emulator": "npx --yes firebase-tools@13.29.1 emulators:exec --only database,storage -- sh -c 'VITE_USE_FIREBASE_EMULATOR=true npm run dev'"
   },
   "dependencies": {
     "@emotion/react": "^11.10.6",
