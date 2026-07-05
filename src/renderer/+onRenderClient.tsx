@@ -19,8 +19,10 @@ async function render(
   const container = document.getElementById("root");
   if (container === null) return;
 
-  // 初遷移でcsrページである or client side routingである
-  if (container?.innerHTML === "" || !pageContext.isHydration) {
+  const isPlaceholder = container.textContent?.trim() === "loading...";
+
+  // 初遷移でcsrページである or client side routingである or プレースホルダHTML
+  if (container.innerHTML === "" || !pageContext.isHydration || isPlaceholder) {
     if (!root) {
       root = createRoot(container);
     }

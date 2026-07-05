@@ -29,4 +29,4 @@ function Page() {
 
 ## Custom HTML
 
-Only `/online` has page-level `+onRenderHtml.tsx` for SEO meta.
+SEO meta is defined in `src/renderer/+onRenderHtml.tsx` for all pages.
