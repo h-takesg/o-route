@@ -20,7 +20,7 @@ rooms/{roomId}/timestamp | image | lines/{id}/points,isDrawing,timestamp | view/
 
 ## Hotspot
 
-`OnlineCanvas.tsx` (~330 lines) centralizes sync and view sharing. Change with care.
+Sync logic lives in `hooks/useOnlineLines.ts`, `hooks/useOnlineRoomImage.ts`, and `hooks/useViewSharing.ts`. `OnlineCanvas.tsx` wires them together.
 
 ## Known issues (verify before fixing)
 
