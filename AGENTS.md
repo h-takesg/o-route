@@ -433,6 +433,8 @@ npm run emulators
 - CLI: `firebase-tools`（devDependencies）
 - `npm run dev` のみでは **本番 Firebase** に接続。Emulator 向きは上記コマンドか環境変数が必要
 
+**トラブルシュート**: ブラウザで `127.0.0.1:9000` への `ERR_CONNECTION_REFUSED` が出る場合、アプリは Emulator 向きだが **RTDB Emulator が起動していない**（または Dev Container の port 9000 がホストに転送されていない）。`npm run dev:emulator` を使うか、別ターミナルで `npm run emulators` を先に起動する。
+
 ---
 
 ## 更新履歴
