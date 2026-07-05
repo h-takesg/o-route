@@ -5,7 +5,7 @@ import { Mode } from "../types";
 import { Lines, DrawLine } from "../models/LineModel";
 import { Overlay } from "./Overlay";
 import { BasicControl } from "./BasicControl";
-import { useWindowSize } from "../hooks/useWindwosSize";
+import { useWindowSize } from "../hooks/useWindowSize";
 import { ViewModel } from "../models/ViewModel";
 
 function LocalCanvas() {

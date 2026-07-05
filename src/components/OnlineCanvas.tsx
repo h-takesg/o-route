@@ -25,7 +25,7 @@ import { Point, Vector } from "../math";
 import { Overlay } from "./Overlay";
 import { BasicControl } from "./BasicControl";
 import { ViewSharingControl } from "./ViewSharingControl";
-import { useWindowSize } from "../hooks/useWindwosSize";
+import { useWindowSize } from "../hooks/useWindowSize";
 import { ViewModel } from "../models/ViewModel";
 
 type Props = {

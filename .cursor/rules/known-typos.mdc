@@ -8,6 +8,5 @@ alwaysApply: true
 | Name | Location | Why |
 |------|----------|-----|
 | `"follwer"` | `types.ts`, UI, Firebase `view` mode | Stored in DB/UI state; needs backward compat |
-| `useWindwosSize.ts` | `src/hooks/` | Filename typo; rename in dedicated branch only |
 
-If an AI suggests fixing these, check `AGENTS.md` first and use a separate small branch.
+If an AI suggests fixing this, check `AGENTS.md` first and use a separate small branch.
