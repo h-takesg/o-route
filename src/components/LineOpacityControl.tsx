@@ -1,8 +1,20 @@
 import { ToggleButton, ToggleButtonGroup } from "@mui/material";
-import Circle from "@mui/icons-material/Circle";
-import Contrast from "@mui/icons-material/Contrast";
-import RadioButtonUnchecked from "@mui/icons-material/RadioButtonUnchecked";
+import Circle_ from "@mui/icons-material/Circle";
+import Contrast_ from "@mui/icons-material/Contrast";
+import RadioButtonUnchecked_ from "@mui/icons-material/RadioButtonUnchecked";
 import { LineOpacity } from "../types";
+
+// https://github.com/mui/material-ui/issues/37375
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+const Circle: typeof Circle_ = Circle_.default ?? Circle_;
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
+const Contrast: typeof Contrast_ = Contrast_.default ?? Contrast_;
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// prettier-ignore
+// @ts-ignore
+const RadioButtonUnchecked: typeof RadioButtonUnchecked_ = RadioButtonUnchecked_.default ?? RadioButtonUnchecked_;
 
 type Props = {
   lineOpacity: LineOpacity;
