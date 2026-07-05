@@ -417,8 +417,10 @@ npm run dev      # 手動確認（ローカルモードは Firebase 不要）
 
 ### Firebase Emulator（ローカル開発）
 
+**前提**: JDK **21 以上**（RTDB Emulator 用）。Dev Container では `devcontainer.json` に Java 21 feature を指定済み。
+
 ```bash
-# エミュレータ + dev サーバーをまとめて起動
+# エミュレータ + dev サーバーをまとめて起動（DB/Storage は Emulator 向き）
 npm run dev:emulator
 
 # 別ターミナルで使う場合
@@ -429,6 +431,7 @@ npm run emulators
 - Emulator UI: http://127.0.0.1:4000
 - RTDB: port 9000 / Storage: port 9199（`firebase.json` で定義）
 - CLI: `firebase-tools`（devDependencies）
+- `npm run dev` のみでは **本番 Firebase** に接続。Emulator 向きは上記コマンドか環境変数が必要
 
 ---
 
