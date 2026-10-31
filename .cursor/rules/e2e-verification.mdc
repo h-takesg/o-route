@@ -7,6 +7,8 @@ alwaysApply: true
 
 Use automated checks before reporting UI/canvas/online work as done.
 
+**Run `npm run test:e2e`, `npm run verify`, and other npm scripts inside the Dev Container** (not on the Windows host with bind-mounted `node_modules`).
+
 ## Commands
 
 | Command | When |
@@ -23,14 +25,18 @@ Prefer stable `data-testid` attributes:
 - `mode-move`, `mode-draw`, `mode-erase` — toolbar modes
 - `clear-all`, `load-image` — toolbar actions
 - `canvas-stage` — Konva canvas wrapper
+- `view-single`, `view-leader`, `view-follwer` — view sharing modes (`follwer` typo intentional)
+- `invalid-room-key` — invalid/missing room key error page
 
-Reuse helpers in `e2e/helpers.ts` (`goToLocalMode`, `drawStrokeOnCanvas`, etc.).
+Reuse helpers in `e2e/helpers.ts` (`goToLocalMode`, `drawStrokeOnCanvas`, `roomUrl`, `createOnlineRoom`, etc.).
 
 ## Online tests
 
 E2E starts Firebase Emulator automatically via `npm run e2e:server` (Playwright `webServer`), or reuses a healthy dev server on port 3000.
 
-Online rooms are created through the Emulator REST API (`e2e/helpers.ts`) for stable, headless setup. Home-card click flows are covered indirectly via `/local` navigation and API room creation.
+Online rooms are created through the Emulator REST API (`e2e/helpers.ts`): POST room, PATCH `e2ee.check`, register `#k=` in `roomKeyHashes`. Navigate with `roomUrl(roomId)` (`/online?roomId=…#k=…`). Helpers decrypt RTDB snapshots via `src/crypto/roomCrypto.ts`.
+
+Home-card click flows for keyed rooms are covered in `e2e/room-key.spec.ts`; API room creation covers most online specs.
 
 First-time setup in Dev Container:
 
@@ -38,6 +44,8 @@ First-time setup in Dev Container:
 npm run test:e2e:install
 sudo env "PATH=$PATH" npx playwright install-deps chromium
 ```
+
+If Playwright reports missing browsers after host-side npm, run `npx playwright install chromium` inside the container.
 
 ## Failure artifacts
 
@@ -49,5 +57,6 @@ On failure, inspect:
 ## Scope guidance
 
 - Canvas drawing: verify mode switch + stroke via `canvasHasRedStroke`
-- Online room: use `enter-online` (creates room via Emulator), not production Firebase
+- Online room: prefer `createOnlineRoom` + `roomUrl` (keyed E2EE room), not URL without `#k=`
+- Room key errors: `/errors/invalid_room_key` (`invalid-room-key`)
 - Do not rely on browser MCP alone when `npm run test:e2e` can cover the flow

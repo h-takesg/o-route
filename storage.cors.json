@@ -1,0 +1,7 @@
+[
+  {
+    "origin": ["https://o-route.web.app", "https://o-route.firebaseapp.com"],
+    "method": ["GET"],
+    "maxAgeSeconds": 3600
+  }
+]
