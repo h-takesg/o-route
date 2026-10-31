@@ -6,6 +6,7 @@ import {
   clickClearAll,
   closeSharedOnlineClients,
   drawStrokeOnCanvas,
+  drawStrokeOnCanvasAt,
   endStrokeOnCanvas,
   getCanvasLinePointCounts,
   getKonvaViewGroupRotation,
@@ -20,6 +21,7 @@ import {
   waitForKonvaMapImage,
   waitForNoRedStroke,
   waitForRedStroke,
+  waitForCanvasLinesSnapshot,
   waitForRoomLinesSnapshot,
 } from "./helpers";
 
@@ -67,9 +69,10 @@ test.describe("online sync (multi-client baseline)", () => {
     }
   });
 
-  test.fail(
-    "known bug: late join duplicates points while line is still drawing",
-    async ({ browser, request }) => {
+  test("late join does not duplicate points while line is still drawing", async ({
+    browser,
+    request,
+  }) => {
       const clients = await openSharedOnlineRoom(browser, request);
       try {
         const { pageA, pageB, roomId } = clients;
@@ -96,8 +99,31 @@ test.describe("online sync (multi-client baseline)", () => {
       } finally {
         await closeSharedOnlineClients(clients);
       }
-    },
-  );
+    });
+
+  test("client B joining after two finished strokes matches decrypted DB points", async ({
+    browser,
+    request,
+  }) => {
+    const clients = await openSharedOnlineRoom(browser, request);
+    try {
+      const { pageA, pageB, roomId } = clients;
+
+      await selectMode(pageA, "draw");
+      await drawStrokeOnCanvasAt(pageA, 0.35, 0.4, 0.65, 0.4);
+      await drawStrokeOnCanvasAt(pageA, 0.3, 0.65, 0.7, 0.65);
+
+      const dbSnapshot = await waitForRoomLinesSnapshot(request, roomId, {
+        lineCount: 2,
+        minPointCount: 6,
+      });
+
+      await joinSharedOnlineRoom(clients);
+      await waitForCanvasLinesSnapshot(pageB, dbSnapshot);
+    } finally {
+      await closeSharedOnlineClients(clients);
+    }
+  });
 
   test("client B no longer sees a line after A erases it", async ({ browser, request }) => {
     const clients = await openSharedOnlineRoom(browser, request);

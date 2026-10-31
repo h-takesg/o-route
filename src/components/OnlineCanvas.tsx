@@ -24,8 +24,10 @@ function OnlineCanvas({ roomId, roomKey }: Props) {
   const [lineOpacity, setLineOpacity] = useState<LineOpacity>("opaque");
 
   const { imageUrl, setImage, uploadError, clearUploadError } = useOnlineRoomImage(roomId, roomKey);
-  const { lines, addPointToDrawingLine, endDrawing, removeLines, clearAllLines } =
-    useOnlineLines(roomId);
+  const { lines, addPointToDrawingLine, endDrawing, removeLines, clearAllLines } = useOnlineLines(
+    roomId,
+    roomKey,
+  );
 
   useEffect(() => {
     if (uploadError === null) return;

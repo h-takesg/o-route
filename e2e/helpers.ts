@@ -11,8 +11,12 @@ import { fileURLToPath } from "node:url";
 import {
   buildRoomKeyHash,
   createRoomKeyCheck,
+  decryptNumbers,
   exportRoomKey,
   generateRoomKey,
+  importRoomKey,
+  linePurpose,
+  parseRoomKeyFromHash,
 } from "../src/crypto/roomCrypto";
 
 const e2eDir = path.dirname(fileURLToPath(import.meta.url));
@@ -41,16 +45,50 @@ export type RoomLinesSnapshot = {
   lines: RoomLineSnapshot[];
 };
 
-function normalizePoints(points: unknown): number[] {
-  if (Array.isArray(points)) return points;
-  if (typeof points === "object" && points !== null) {
-    const record = points as Record<string, number>;
-    return Object.keys(record)
-      .map(Number)
-      .sort((a, b) => a - b)
-      .map((index) => record[String(index)]);
+type RawLineRecord = {
+  points?: unknown;
+  isDrawing?: boolean;
+  timestamp?: number;
+  chunks?: unknown;
+};
+
+type RawRoomLines = Record<string, RawLineRecord> | null;
+
+function chunkEntries(chunks: unknown): { index: number; envelope: unknown }[] {
+  if (typeof chunks !== "object" || chunks === null) return [];
+  if (Array.isArray(chunks)) {
+    return chunks.map((envelope, index) => ({ index, envelope }));
   }
-  return [];
+  const record = chunks as Record<string, unknown>;
+  return Object.keys(record)
+    .map(Number)
+    .filter((index) => Number.isInteger(index) && index >= 0)
+    .sort((a, b) => a - b)
+    .map((index) => ({ index, envelope: record[String(index)] }));
+}
+
+function linePayloadHasIllegalNumbers(value: unknown, allowTimestamp: boolean): boolean {
+  if (typeof value === "number") {
+    return !allowTimestamp;
+  }
+  if (Array.isArray(value)) {
+    return value.some((entry) => linePayloadHasIllegalNumbers(entry, false));
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.entries(value).some(([key, entry]) => {
+      const childAllowsTimestamp = allowTimestamp && key === "timestamp";
+      return linePayloadHasIllegalNumbers(entry, childAllowsTimestamp);
+    });
+  }
+  return false;
+}
+
+async function roomKeyForId(roomId: string): Promise<CryptoKey> {
+  const encodedKey = parseRoomKeyFromHash(getRoomKeyHash(roomId));
+  if (encodedKey === null) {
+    throw new Error(`no room key registered for roomId ${roomId}`);
+  }
+  return importRoomKey(encodedKey);
 }
 
 export async function waitForCanvas(page: Page): Promise<Locator> {
@@ -295,34 +333,70 @@ export async function waitForCanvasLinesSnapshot(
     .toBe(true);
 }
 
+export async function getRawRoomLines(
+  request: APIRequestContext,
+  roomId: string,
+): Promise<RawRoomLines> {
+  const response = await request.get(emulatorDatabasePath(`/rooms/${roomId}/lines.json`));
+  expect(response.ok()).toBeTruthy();
+  return (await response.json()) as RawRoomLines;
+}
+
+export async function expectNoPlaintextLinePoints(
+  request: APIRequestContext,
+  roomId: string,
+): Promise<void> {
+  const body = await getRawRoomLines(request, roomId);
+  if (body === null) return;
+
+  for (const [, line] of Object.entries(body)) {
+    expect(line).not.toHaveProperty("points");
+    expect(linePayloadHasIllegalNumbers(line, true)).toBe(false);
+
+    for (const { envelope } of chunkEntries(line.chunks)) {
+      expect(typeof envelope).toBe("string");
+      expect(envelope).toMatch(/^1\./);
+    }
+  }
+}
+
 export async function getRoomLinesSnapshot(
   request: APIRequestContext,
   roomId: string,
 ): Promise<RoomLinesSnapshot> {
-  const response = await request.get(emulatorDatabasePath(`/rooms/${roomId}/lines.json`));
-  expect(response.ok()).toBeTruthy();
-  const body = (await response.json()) as Record<
-    string,
-    { points?: unknown; isDrawing?: boolean; timestamp?: number }
-  > | null;
+  const body = await getRawRoomLines(request, roomId);
+  const key = await roomKeyForId(roomId);
 
   if (body === null) {
     return { lineCount: 0, lines: [] };
   }
 
-  const lines = Object.entries(body)
-    .map(([, value]) => {
-      const points = normalizePoints(value.points);
+  const lines = await Promise.all(
+    Object.entries(body).map(async ([lineId, value]) => {
+      const points: number[] = [];
+      for (const { index, envelope } of chunkEntries(value.chunks)) {
+        if (typeof envelope !== "string") continue;
+        try {
+          const chunkPoints = await decryptNumbers(key, envelope, roomId, linePurpose(lineId, index));
+          if (chunkPoints.length % 2 === 0) {
+            points.push(...chunkPoints);
+          }
+        } catch {
+          // skip failed chunks
+        }
+      }
       return {
         isDrawing: value.isDrawing === true,
         pointCount: points.length,
         points,
       };
-    })
-    .sort((a, b) => {
-      if (a.pointCount !== b.pointCount) return a.pointCount - b.pointCount;
-      return a.points[0] - b.points[0];
-    });
+    }),
+  );
+
+  lines.sort((a, b) => {
+    if (a.pointCount !== b.pointCount) return a.pointCount - b.pointCount;
+    return (a.points[0] ?? 0) - (b.points[0] ?? 0);
+  });
 
   return {
     lineCount: lines.length,

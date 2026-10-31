@@ -3,6 +3,7 @@ import {
   canvasHasRedStroke,
   drawStrokeOnCanvas,
   drawStrokeOnCanvasAt,
+  expectNoPlaintextLinePoints,
   getRoomLineCount,
   goToOnlineRoom,
   selectMode,
@@ -62,6 +63,7 @@ test.describe("online room", () => {
       minPointCount: 6,
     });
     expect(snapshot.lines[0]?.isDrawing).toBe(false);
+    await expectNoPlaintextLinePoints(request, roomId);
   });
 
   test("reload preserves all drawn lines with full points", async ({ page, request }) => {
