@@ -40,13 +40,13 @@ function ViewSharingControl({ viewMode, setViewMode }: Props) {
         }}
         onChange={handleModeChange}
       >
-        <ToggleButton value="single">
+        <ToggleButton value="single" data-testid="view-single">
           <Person fontSize="large" />
         </ToggleButton>
-        <ToggleButton value="leader">
+        <ToggleButton value="leader" data-testid="view-leader">
           <FaChessKing style={{ fontSize: "1.7rem" }} />
         </ToggleButton>
-        <ToggleButton value="follwer">
+        <ToggleButton value="follwer" data-testid="view-follwer">
           <People fontSize="large" />
         </ToggleButton>
       </ToggleButtonGroup>

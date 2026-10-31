@@ -1,4 +1,17 @@
-import { expect, type APIRequestContext, type Locator, type Page } from "@playwright/test";
+import {
+  expect,
+  type APIRequestContext,
+  type Browser,
+  type BrowserContext,
+  type Locator,
+  type Page,
+} from "@playwright/test";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const e2eDir = path.dirname(fileURLToPath(import.meta.url));
+export const E2E_FIXTURES_DIR = path.join(e2eDir, "fixtures");
+export const TINY_MAP_IMAGE_PATH = path.join(E2E_FIXTURES_DIR, "tiny-red.png");
 
 const EMULATOR_DATABASE_HOST = "http://127.0.0.1:9000";
 const EMULATOR_DATABASE_NS = "o-route-default-rtdb";
@@ -43,6 +56,7 @@ export async function goToLocalMode(page: Page): Promise<void> {
   await waitForCanvas(page);
 }
 
+/** Phase 2+ E2EE: extend payload here (e.g. room keys) without changing test bodies. */
 export async function createOnlineRoom(
   request: APIRequestContext,
 ): Promise<string> {
@@ -57,6 +71,41 @@ export async function createOnlineRoom(
 
   const body = (await response.json()) as { name: string };
   return body.name;
+}
+
+export type SharedOnlineClients = {
+  roomId: string;
+  contextA: BrowserContext;
+  contextB: BrowserContext;
+  pageA: Page;
+  pageB: Page;
+};
+
+/** Opens the same emulator room in two isolated browser contexts. */
+export async function openSharedOnlineRoom(
+  browser: Browser,
+  request: APIRequestContext,
+): Promise<SharedOnlineClients> {
+  const roomId = await createOnlineRoom(request);
+  // The online toolbar stacks three control groups; the 720px default height pushes "follwer" off-screen.
+  const contextOptions = { viewport: { width: 1280, height: 1000 } };
+  const contextA = await browser.newContext(contextOptions);
+  const contextB = await browser.newContext(contextOptions);
+  const pageA = await contextA.newPage();
+  const pageB = await contextB.newPage();
+  await openOnlineRoom(pageA, roomId);
+  return { roomId, contextA, contextB, pageA, pageB };
+}
+
+export async function joinSharedOnlineRoom(
+  clients: SharedOnlineClients,
+): Promise<void> {
+  await openOnlineRoom(clients.pageB, clients.roomId);
+}
+
+export async function closeSharedOnlineClients(clients: SharedOnlineClients): Promise<void> {
+  await clients.contextA.close();
+  await clients.contextB.close();
 }
 
 export async function goToOnlineRoom(
@@ -277,4 +326,165 @@ export async function getFirstRoomLinePointCount(
 ): Promise<number> {
   const snapshot = await getRoomLinesSnapshot(request, roomId);
   return snapshot.lines[0]?.pointCount ?? 0;
+}
+
+export async function waitForRedStroke(page: Page): Promise<void> {
+  await expect.poll(() => canvasHasRedStroke(page)).toBe(true);
+}
+
+export async function waitForNoRedStroke(page: Page): Promise<void> {
+  await expect.poll(() => canvasHasRedStroke(page)).toBe(false);
+}
+
+export async function selectViewMode(
+  page: Page,
+  mode: "single" | "leader" | "follwer",
+): Promise<void> {
+  const button = page.getByTestId(`view-${mode}`);
+  await expect(button).toBeVisible();
+  await button.click({ timeout: 30_000 });
+  await expect(button).toHaveAttribute("aria-pressed", "true");
+}
+
+export async function clickClearAll(page: Page): Promise<void> {
+  const button = page.getByTestId("clear-all");
+  await expect(button).toBeVisible();
+  await button.click({ timeout: 30_000 });
+}
+
+export async function uploadMapImage(page: Page, filePath: string): Promise<void> {
+  const input = page.getByTestId("load-image").locator('input[type="file"]');
+  await input.setInputFiles(filePath);
+}
+
+export async function konvaMapImageLoaded(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const konva = (
+      window as unknown as {
+        Konva?: {
+          stages: {
+            find: (selector: string) => { image: () => CanvasImageSource | undefined }[];
+          }[];
+        };
+      }
+    ).Konva;
+    if (konva === undefined || konva.stages.length === 0) return false;
+
+    return konva.stages[0].find("Image").some((node) => {
+      const image = node.image();
+      if (image === undefined) return false;
+      if (image instanceof HTMLImageElement) {
+        return image.complete && image.naturalWidth > 0;
+      }
+      return true;
+    });
+  });
+}
+
+export async function waitForKonvaMapImage(page: Page): Promise<void> {
+  await expect.poll(() => konvaMapImageLoaded(page)).toBe(true);
+}
+
+export async function getKonvaViewGroupRotation(page: Page): Promise<number> {
+  return page.evaluate(() => {
+    const konva = (
+      window as unknown as {
+        Konva?: {
+          stages: {
+            getLayers: () => { getChildren: () => { getClassName?: () => string; rotation: () => number }[] }[];
+          }[];
+        };
+      }
+    ).Konva;
+    if (konva === undefined || konva.stages.length === 0) return 0;
+
+    const layer = konva.stages[0].getLayers()[0];
+    if (layer === undefined) return 0;
+
+    const viewGroup = layer
+      .getChildren()
+      .find((node) => node.getClassName?.() === "Group");
+    return viewGroup?.rotation() ?? 0;
+  });
+}
+
+export async function rotateViewCtrlWheel(
+  page: Page,
+  deltaY: number,
+  repeat = 5,
+): Promise<void> {
+  await selectMode(page, "move");
+  const canvas = await waitForCanvas(page);
+  const box = await canvas.boundingBox();
+  if (box === null) {
+    throw new Error("canvas bounding box not found");
+  }
+
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  for (let i = 0; i < repeat; i += 1) {
+    await canvas.dispatchEvent("wheel", { deltaY, ctrlKey: true, bubbles: true });
+  }
+}
+
+type StrokeRatios = {
+  startXRatio: number;
+  startYRatio: number;
+  endXRatio: number;
+  endYRatio: number;
+};
+
+async function strokePointsFromRatios(
+  page: Page,
+  ratios: StrokeRatios,
+): Promise<{ start: { x: number; y: number }; end: { x: number; y: number } }> {
+  const canvas = await waitForCanvas(page);
+  const box = await canvas.boundingBox();
+  if (box === null) {
+    throw new Error("canvas bounding box not found");
+  }
+
+  return {
+    start: {
+      x: box.x + box.width * ratios.startXRatio,
+      y: box.y + box.height * ratios.startYRatio,
+    },
+    end: {
+      x: box.x + box.width * ratios.endXRatio,
+      y: box.y + box.height * ratios.endYRatio,
+    },
+  };
+}
+
+export async function beginStrokeOnCanvas(
+  page: Page,
+  ratios: Partial<StrokeRatios> = {},
+): Promise<void> {
+  const { startXRatio = 0.4, startYRatio = 0.5, endXRatio = 0.6, endYRatio = 0.5 } = ratios;
+  const { start } = await strokePointsFromRatios(page, {
+    startXRatio,
+    startYRatio,
+    endXRatio,
+    endYRatio,
+  });
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+}
+
+export async function moveStrokeOnCanvas(
+  page: Page,
+  ratios: Partial<StrokeRatios> = {},
+  steps = 8,
+): Promise<void> {
+  const { startXRatio = 0.4, startYRatio = 0.5, endXRatio = 0.6, endYRatio = 0.5 } = ratios;
+  const { end } = await strokePointsFromRatios(page, {
+    startXRatio,
+    startYRatio,
+    endXRatio,
+    endYRatio,
+  });
+  await page.mouse.move(end.x, end.y, { steps });
+}
+
+export async function endStrokeOnCanvas(page: Page): Promise<void> {
+  await page.mouse.up();
 }
