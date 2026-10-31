@@ -35,7 +35,7 @@ function OnlineCanvas({ roomId, roomKey }: Props) {
     clearUploadError();
   }, [uploadError, clearUploadError]);
 
-  useViewSharing(roomId, viewMode, setViewMode, viewModel, setViewModel, width, height);
+  useViewSharing(roomId, roomKey, viewMode, setViewMode, viewModel, setViewModel, width, height);
 
   return (
     <>

@@ -348,6 +348,17 @@ export async function getRawRoomLines(
   return (await response.json()) as RawRoomLines;
 }
 
+export type RawRoomView = Record<string, unknown> | null;
+
+export async function getRawRoomView(
+  request: APIRequestContext,
+  roomId: string,
+): Promise<RawRoomView> {
+  const response = await request.get(emulatorDatabasePath(`/rooms/${roomId}/view.json`));
+  expect(response.ok()).toBeTruthy();
+  return (await response.json()) as RawRoomView;
+}
+
 export async function expectNoPlaintextLinePoints(
   request: APIRequestContext,
   roomId: string,
@@ -611,6 +622,69 @@ export async function getKonvaViewGroupRotation(page: Page): Promise<number> {
       .find((node) => node.getClassName?.() === "Group");
     return viewGroup?.rotation() ?? 0;
   });
+}
+
+export type KonvaViewGroupTransform = {
+  x: number;
+  y: number;
+  scaleX: number;
+  scaleY: number;
+  rotation: number;
+};
+
+export async function getKonvaViewGroupTransform(page: Page): Promise<KonvaViewGroupTransform> {
+  return page.evaluate(() => {
+    const konva = (
+      window as unknown as {
+        Konva?: {
+          stages: {
+            getLayers: () => {
+              getChildren: () => {
+                getClassName?: () => string;
+                x: () => number;
+                y: () => number;
+                scaleX: () => number;
+                scaleY: () => number;
+                rotation: () => number;
+              }[];
+            }[];
+          }[];
+        };
+      }
+    ).Konva;
+    if (konva === undefined || konva.stages.length === 0) {
+      return { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 };
+    }
+
+    const layer = konva.stages[0].getLayers()[0];
+    if (layer === undefined) {
+      return { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 };
+    }
+
+    const viewGroup = layer
+      .getChildren()
+      .find((node) => node.getClassName?.() === "Group");
+    if (viewGroup === undefined) {
+      return { x: 0, y: 0, scaleX: 1, scaleY: 1, rotation: 0 };
+    }
+
+    return {
+      x: viewGroup.x(),
+      y: viewGroup.y(),
+      scaleX: viewGroup.scaleX(),
+      scaleY: viewGroup.scaleY(),
+      rotation: viewGroup.rotation(),
+    };
+  });
+}
+
+export async function expectKonvaViewGroupTransformFinite(page: Page): Promise<void> {
+  const transform = await getKonvaViewGroupTransform(page);
+  expect(Number.isFinite(transform.x)).toBe(true);
+  expect(Number.isFinite(transform.y)).toBe(true);
+  expect(Number.isFinite(transform.scaleX)).toBe(true);
+  expect(Number.isFinite(transform.scaleY)).toBe(true);
+  expect(Number.isFinite(transform.rotation)).toBe(true);
 }
 
 export async function rotateViewCtrlWheel(
