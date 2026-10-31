@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  DataSnapshot,
   DatabaseReference,
   child,
   onChildAdded,
@@ -12,18 +11,20 @@ import {
   set,
   update,
 } from "firebase/database";
+import { decryptNumbers, encryptNumbers, linePurpose } from "../crypto/roomCrypto";
 import { firebaseApp } from "../firebase";
+import { ChunkAssembler } from "../models/ChunkAssembler";
 import { DrawLine, Lines } from "../models/LineModel";
 import { Point } from "../math";
 import { useDatabaseRef } from "./useDatabaseRef";
 
-function useOnlineLines(roomId: string) {
+function useOnlineLines(roomId: string, roomKey: CryptoKey) {
   const linesRef = useDatabaseRef(firebaseApp, `rooms/${roomId}/lines`);
   const drawingLineRef = useRef<DatabaseReference | null>(null);
   const ownLineKeysRef = useRef<Set<string>>(new Set());
   const suppressedLineKeysRef = useRef<Set<string>>(new Set());
-  const drawingPointCountRef = useRef<Map<string, number>>(new Map());
-  const initialLineWriteRef = useRef<Map<string, Promise<void>>>(new Map());
+  const nextChunkIndexRef = useRef<Map<string, number>>(new Map());
+  const lineWriteQueueRef = useRef<Map<string, Promise<void>>>(new Map());
   const [lines, setLines] = useState(new Lines());
   const linesStateRef = useRef(lines);
 
@@ -35,18 +36,29 @@ function useOnlineLines(roomId: string) {
     });
   };
 
-  const afterInitialLineWrite = (key: string, write: () => void | Promise<void>) => {
-    const initialWrite = initialLineWriteRef.current.get(key) ?? Promise.resolve();
-    void initialWrite.then(write).catch((error) => {
-      console.error("firebase line write failed", error);
+  const enqueueLineWrite = (key: string, step: () => Promise<void>) => {
+    const previous = lineWriteQueueRef.current.get(key) ?? Promise.resolve();
+    const next = previous
+      .then(async () => {
+        if (suppressedLineKeysRef.current.has(key)) return;
+        await step();
+      })
+      .catch((error) => {
+        console.error("firebase line write failed", error);
+      });
+    lineWriteQueueRef.current.set(key, next);
+    void next.finally(() => {
+      if (lineWriteQueueRef.current.get(key) === next) {
+        lineWriteQueueRef.current.delete(key);
+      }
     });
   };
 
   const suppressAndRemoveFromDb = (key: string) => {
     suppressedLineKeysRef.current.add(key);
     ownLineKeysRef.current.delete(key);
-    drawingPointCountRef.current.delete(key);
-    initialLineWriteRef.current.delete(key);
+    nextChunkIndexRef.current.delete(key);
+    lineWriteQueueRef.current.delete(key);
     remove(child(linesRef, key));
   };
 
@@ -57,14 +69,33 @@ function useOnlineLines(roomId: string) {
     orphans.forEach((key) => suppressAndRemoveFromDb(key));
   };
 
-  const addNewPointFactory = (lineKey: string) => {
-    return (snapshot: DataSnapshot) => {
-      commitLines((oldLines) => oldLines.addValue(lineKey, snapshot.val()));
-    };
-  };
-
   useEffect(() => {
+    let cancelled = false;
+    const assemblers = new Map<string, ChunkAssembler>();
     const lineChildUnsubs = new Map<string, (() => void)[]>();
+
+    const offerChunk = async (lineKey: string, index: number, envelope: unknown) => {
+      let values: number[] = [];
+      if (typeof envelope === "string" && Number.isInteger(index)) {
+        try {
+          values = await decryptNumbers(roomKey, envelope, roomId, linePurpose(lineKey, index));
+          if (values.length % 2 !== 0) {
+            values = [];
+          }
+        } catch (error) {
+          console.error("line chunk decrypt failed", error);
+          values = [];
+        }
+      }
+
+      if (cancelled) return;
+      const assembler = assemblers.get(lineKey);
+      if (assembler === undefined) return;
+      const ready = assembler.offer(index, values);
+      if (ready.length > 0) {
+        commitLines((oldLines) => oldLines.appendValues(lineKey, ready));
+      }
+    };
 
     const unsubscribeLinesAdded = onChildAdded(linesRef, (snapshot) => {
       if (snapshot.key === null) return;
@@ -80,39 +111,58 @@ function useOnlineLines(roomId: string) {
           return oldLines.updateTimestamp(snapshot.key!, snapshot.child("timestamp").val());
         });
       } else {
-        commitLines((oldLines) => {
-          return oldLines.addLineWithKey(snapshot.key!, DrawLine.of(snapshot.val()));
+        const lineKey = snapshot.key;
+        const val = snapshot.val() as { isDrawing?: boolean; timestamp?: number };
+        commitLines((oldLines) =>
+          oldLines.addLineWithKey(
+            lineKey,
+            new DrawLine({
+              isDrawing: val.isDrawing === true,
+              timestamp: typeof val.timestamp === "number" ? val.timestamp : Date.now(),
+            }),
+          ),
+        );
+
+        assemblers.set(lineKey, new ChunkAssembler());
+
+        snapshot.child("chunks").forEach((chunkSnapshot) => {
+          void offerChunk(lineKey, Number(chunkSnapshot.key), chunkSnapshot.val());
         });
 
-        if (snapshot.val().isDrawing) {
-          const lineKey = snapshot.key;
-          const pointsRef = child(linesRef, `${lineKey}/points`);
+        if (val.isDrawing === true) {
+          const chunksRef = child(linesRef, `${lineKey}/chunks`);
           const isDrawingRef = child(linesRef, `${lineKey}/isDrawing`);
-          const pointsUnsub = onChildAdded(pointsRef, addNewPointFactory(lineKey));
-          const isDrawingUnsub = onValue(isDrawingRef, (snapshotIsDrawing) => {
-            if (!snapshotIsDrawing.val()) {
+          const chunksUnsub = onChildAdded(chunksRef, (chunkSnapshot) => {
+            void offerChunk(lineKey, Number(chunkSnapshot.key), chunkSnapshot.val());
+          });
+          const isDrawingUnsub = onValue(isDrawingRef, (isDrawingSnapshot) => {
+            if (!isDrawingSnapshot.val()) {
               lineChildUnsubs.get(lineKey)?.forEach((unsub) => unsub());
               lineChildUnsubs.delete(lineKey);
             }
           });
-          lineChildUnsubs.set(lineKey, [pointsUnsub, isDrawingUnsub]);
+          lineChildUnsubs.set(lineKey, [chunksUnsub, isDrawingUnsub]);
         }
       }
     });
 
     const unsubscribeLinesRemoved = onChildRemoved(linesRef, (snapshot) => {
-      commitLines((oldLines) => {
-        if (snapshot.key === null) return oldLines;
+      if (snapshot.key === null) return;
 
-        return oldLines.removeLine(snapshot.key);
-      });
+      assemblers.delete(snapshot.key);
+      lineChildUnsubs.get(snapshot.key)?.forEach((unsub) => unsub());
+      lineChildUnsubs.delete(snapshot.key);
+
+      commitLines((oldLines) => oldLines.removeLine(snapshot.key!));
     });
 
     return () => {
+      cancelled = true;
       unsubscribeLinesAdded();
       unsubscribeLinesRemoved();
       lineChildUnsubs.forEach((subs) => subs.forEach((unsub) => unsub()));
       lineChildUnsubs.clear();
+      assemblers.clear();
     };
   }, [linesRef]);
 
@@ -125,7 +175,6 @@ function useOnlineLines(roomId: string) {
       suppressedLineKeysRef.current.has(currentKey);
 
     if (shouldStartNewLine) {
-      const newLine = new DrawLine({ isDrawing: true }).addPoint(point);
       drawingLineRef.current = push(linesRef);
 
       if (drawingLineRef.current.key === null) {
@@ -136,35 +185,48 @@ function useOnlineLines(roomId: string) {
       const newKey = drawingLineRef.current.key;
       const lineRef = drawingLineRef.current;
       ownLineKeysRef.current.add(newKey);
-      drawingPointCountRef.current.set(newKey, 2);
+      nextChunkIndexRef.current.set(newKey, 1);
 
-      commitLines((oldLines) => oldLines.addLineWithKey(newKey, newLine));
+      commitLines((oldLines) =>
+        oldLines.addLineWithKey(newKey, new DrawLine({ isDrawing: true }).addPoint(point)),
+      );
 
-      const uploadLine = {
-        ...newLine.toJS(),
-        timestamp: serverTimestamp(),
-      };
-      // 初回 set だけ直列化の起点にする。後続 update は並列で送ってよい。
-      const initialWrite = set(lineRef, uploadLine).catch((error) => {
-        console.error("firebase line write failed", error);
+      enqueueLineWrite(newKey, async () => {
+        const env = await encryptNumbers(
+          roomKey,
+          [point.x, point.y],
+          roomId,
+          linePurpose(newKey, 0),
+        );
+        if (suppressedLineKeysRef.current.has(newKey)) return;
+        await set(lineRef, {
+          isDrawing: true,
+          timestamp: serverTimestamp(),
+          chunks: { 0: env },
+        });
       });
-      initialLineWriteRef.current.set(newKey, initialWrite);
     } else {
       const key = currentKey;
       const drawingRef = currentDrawingRef;
-      const pointIndex = drawingPointCountRef.current.get(key);
-      if (typeof pointIndex === "undefined") return;
+      const index = nextChunkIndexRef.current.get(key);
+      if (typeof index === "undefined") return;
 
-      drawingPointCountRef.current.set(key, pointIndex + 2);
+      nextChunkIndexRef.current.set(key, index + 1);
       commitLines((oldLines) => oldLines.addPoint(key, point));
 
-      const uploadIndex = pointIndex;
-      afterInitialLineWrite(key, () =>
-        update(child(drawingRef, "points"), {
-          [uploadIndex]: point.x,
-          [uploadIndex + 1]: point.y,
-        }),
-      );
+      const chunkIndex = index;
+      enqueueLineWrite(key, async () => {
+        const env = await encryptNumbers(
+          roomKey,
+          [point.x, point.y],
+          roomId,
+          linePurpose(key, chunkIndex),
+        );
+        if (suppressedLineKeysRef.current.has(key)) return;
+        update(child(drawingRef, "chunks"), { [chunkIndex]: env }).catch((error) => {
+          console.error("firebase line write failed", error);
+        });
+      });
     }
   };
 
@@ -173,17 +235,15 @@ function useOnlineLines(roomId: string) {
     if (ref === null || ref.key === null) return;
 
     const key = ref.key;
-    const initialWrite = initialLineWriteRef.current.get(key) ?? Promise.resolve();
     drawingLineRef.current = null;
-    drawingPointCountRef.current.delete(key);
-    initialLineWriteRef.current.delete(key);
+    nextChunkIndexRef.current.delete(key);
 
     if (!suppressedLineKeysRef.current.has(key) && linesStateRef.current.lines.has(key)) {
-      void initialWrite
-        .then(() => update(ref, { isDrawing: false }))
-        .catch((error) => {
+      enqueueLineWrite(key, async () => {
+        update(ref, { isDrawing: false }).catch((error) => {
           console.error("firebase line write failed", error);
         });
+      });
     }
   };
 
@@ -202,8 +262,8 @@ function useOnlineLines(roomId: string) {
 
   const clearAllLines = () => {
     drawingLineRef.current = null;
-    drawingPointCountRef.current.clear();
-    initialLineWriteRef.current.clear();
+    nextChunkIndexRef.current.clear();
+    lineWriteQueueRef.current.clear();
     ownLineKeysRef.current.forEach((key) => {
       suppressedLineKeysRef.current.add(key);
     });
