@@ -74,6 +74,12 @@ class Lines extends LinesBase {
     return this.setIn(["lines", key], newLine);
   }
 
+  appendValues(key: string, values: number[]) {
+    const line = this.lines.get(key);
+    if (typeof line === "undefined" || values.length === 0) return this;
+    return this.setIn(["lines", key], line.set("points", line.points.push(...values)));
+  }
+
   endDrawing(key: string) {
     const newLine = this.lines.get(key)?.endDrawing();
     return this.setIn(["lines", key], newLine);
