@@ -11,9 +11,13 @@ import { fileURLToPath } from "node:url";
 import {
   buildRoomKeyHash,
   createRoomKeyCheck,
+  decryptBinary,
+  decryptJson,
   decryptNumbers,
   exportRoomKey,
   generateRoomKey,
+  IMAGE_META_PURPOSE,
+  imageBlobPurpose,
   importRoomKey,
   linePurpose,
   parseRoomKeyFromHash,
@@ -25,6 +29,8 @@ export const TINY_MAP_IMAGE_PATH = path.join(E2E_FIXTURES_DIR, "tiny-red.png");
 
 const EMULATOR_DATABASE_HOST = "http://127.0.0.1:9000";
 const EMULATOR_DATABASE_NS = "o-route-default-rtdb";
+const EMULATOR_STORAGE_HOST = "http://127.0.0.1:9199";
+const STORAGE_BUCKET = "o-route.appspot.com";
 
 const roomKeyHashes = new Map<string, string>();
 
@@ -499,6 +505,89 @@ export async function konvaMapImageLoaded(page: Page): Promise<boolean> {
 
 export async function waitForKonvaMapImage(page: Page): Promise<void> {
   await expect.poll(() => konvaMapImageLoaded(page)).toBe(true);
+}
+
+export async function getRoomImageField(
+  request: APIRequestContext,
+  roomId: string,
+): Promise<unknown> {
+  const response = await request.get(emulatorDatabasePath(`/rooms/${roomId}/image.json`));
+  expect(response.ok()).toBeTruthy();
+  return response.json();
+}
+
+type StorageListItem = {
+  name: string;
+  contentType?: string;
+};
+
+type StorageListResponse = {
+  items?: StorageListItem[];
+};
+
+export async function getLatestRawStorageObjectForRoom(
+  request: APIRequestContext,
+  roomId: string,
+): Promise<{ name: string; contentType: string; bytes: Buffer }> {
+  const prefix = `${roomId}/`;
+  const listUrl = `${EMULATOR_STORAGE_HOST}/v0/b/${STORAGE_BUCKET}/o?prefix=${encodeURIComponent(prefix)}`;
+  const listResponse = await request.get(listUrl);
+  expect(listResponse.ok()).toBeTruthy();
+  const listBody = (await listResponse.json()) as StorageListResponse;
+  const items = listBody.items ?? [];
+  if (items.length === 0) {
+    throw new Error(`no storage objects found for room ${roomId}`);
+  }
+  const latest = items.reduce((a, b) => (a.name > b.name ? a : b));
+  const mediaUrl = `${EMULATOR_STORAGE_HOST}/v0/b/${STORAGE_BUCKET}/o/${encodeURIComponent(latest.name)}?alt=media`;
+  const mediaResponse = await request.get(mediaUrl);
+  expect(mediaResponse.ok()).toBeTruthy();
+  const bytes = Buffer.from(await mediaResponse.body());
+  return {
+    name: latest.name,
+    contentType: latest.contentType ?? mediaResponse.headers()["content-type"] ?? "",
+    bytes,
+  };
+}
+
+export async function waitForEncryptedRoomImageMeta(
+  request: APIRequestContext,
+  roomId: string,
+): Promise<string> {
+  let envelope = "";
+  await expect
+    .poll(async () => {
+      const value = await getRoomImageField(request, roomId);
+      if (typeof value !== "string" || value.length === 0) return false;
+      if (!value.startsWith("1.")) return false;
+      if (value.includes("http")) return false;
+      envelope = value;
+      return true;
+    })
+    .toBe(true);
+  return envelope;
+}
+
+export async function decryptRoomImageFixture(
+  request: APIRequestContext,
+  roomId: string,
+  envelope: string,
+): Promise<{ path: string; plaintext: Uint8Array }> {
+  const key = await roomKeyForId(roomId);
+  const meta = await decryptJson<{ path: string; type: string }>(
+    key,
+    envelope,
+    roomId,
+    IMAGE_META_PURPOSE,
+  );
+  const storageObject = await getLatestRawStorageObjectForRoom(request, roomId);
+  const plaintext = await decryptBinary(
+    key,
+    new Uint8Array(storageObject.bytes),
+    roomId,
+    imageBlobPurpose(meta.path),
+  );
+  return { path: meta.path, plaintext };
 }
 
 export async function getKonvaViewGroupRotation(page: Page): Promise<number> {

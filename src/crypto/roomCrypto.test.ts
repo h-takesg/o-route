@@ -2,12 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   buildRoomKeyHash,
   createRoomKeyCheck,
+  decryptBinary,
   decryptBytes,
   decryptJson,
   decryptNumbers,
+  encryptBinary,
   encryptBytes,
   encryptJson,
   encryptNumbers,
+  ENCRYPTION_OVERHEAD_BYTES,
   exportRoomKey,
   generateRoomKey,
   importRoomKey,
@@ -148,5 +151,41 @@ describe("roomCrypto", () => {
     const key = await generateRoomKey();
     const envelope = await encryptBytes(key, new Uint8Array([1, 2, 3]), roomId, purpose);
     await expect(decryptNumbers(key, envelope, roomId, purpose)).rejects.toThrow();
+  });
+
+  it("round-trips binary with overhead equal to ENCRYPTION_OVERHEAD_BYTES", async () => {
+    const key = await generateRoomKey();
+    const plaintext = new Uint8Array([10, 20, 30, 40, 50]);
+    const ciphertext = await encryptBinary(key, plaintext, roomId, purpose);
+    expect(ciphertext.length).toBe(plaintext.length + ENCRYPTION_OVERHEAD_BYTES);
+    const decrypted = await decryptBinary(key, ciphertext, roomId, purpose);
+    expect(Array.from(decrypted)).toEqual(Array.from(plaintext));
+  });
+
+  it("decryptBinary fails with wrong key", async () => {
+    const key = await generateRoomKey();
+    const otherKey = await generateRoomKey();
+    const ciphertext = await encryptBinary(key, new Uint8Array([1]), roomId, purpose);
+    await expect(decryptBinary(otherKey, ciphertext, roomId, purpose)).rejects.toThrow();
+  });
+
+  it("decryptBinary fails when tampered", async () => {
+    const key = await generateRoomKey();
+    const ciphertext = await encryptBinary(key, new Uint8Array([1, 2, 3]), roomId, purpose);
+    const tampered = new Uint8Array(ciphertext);
+    tampered[tampered.length - 1]! ^= 0xff;
+    await expect(decryptBinary(key, tampered, roomId, purpose)).rejects.toThrow();
+  });
+
+  it("decryptBinary fails on AAD mismatch", async () => {
+    const key = await generateRoomKey();
+    const ciphertext = await encryptBinary(key, new Uint8Array([9]), roomId, purpose);
+    await expect(decryptBinary(key, ciphertext, "other-room", purpose)).rejects.toThrow();
+    await expect(decryptBinary(key, ciphertext, roomId, "other-purpose")).rejects.toThrow();
+  });
+
+  it("decryptBinary rejects too-short input", async () => {
+    const key = await generateRoomKey();
+    await expect(decryptBinary(key, new Uint8Array(10), roomId, purpose)).rejects.toThrow();
   });
 });
