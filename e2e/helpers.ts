@@ -8,6 +8,12 @@ import {
 } from "@playwright/test";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  buildRoomKeyHash,
+  createRoomKeyCheck,
+  exportRoomKey,
+  generateRoomKey,
+} from "../src/crypto/roomCrypto";
 
 const e2eDir = path.dirname(fileURLToPath(import.meta.url));
 export const E2E_FIXTURES_DIR = path.join(e2eDir, "fixtures");
@@ -16,9 +22,13 @@ export const TINY_MAP_IMAGE_PATH = path.join(E2E_FIXTURES_DIR, "tiny-red.png");
 const EMULATOR_DATABASE_HOST = "http://127.0.0.1:9000";
 const EMULATOR_DATABASE_NS = "o-route-default-rtdb";
 
-function emulatorDatabasePath(path: string): string {
-  return `${EMULATOR_DATABASE_HOST}${path}?ns=${EMULATOR_DATABASE_NS}`;
+const roomKeyHashes = new Map<string, string>();
+
+function emulatorDatabasePath(dbPath: string): string {
+  return `${EMULATOR_DATABASE_HOST}${dbPath}?ns=${EMULATOR_DATABASE_NS}`;
 }
+
+export { emulatorDatabasePath };
 
 export type RoomLineSnapshot = {
   isDrawing: boolean;
@@ -56,7 +66,27 @@ export async function goToLocalMode(page: Page): Promise<void> {
   await waitForCanvas(page);
 }
 
-/** Phase 2+ E2EE: extend payload here (e.g. room keys) without changing test bodies. */
+export function getRoomKeyHash(roomId: string): string {
+  const hash = roomKeyHashes.get(roomId);
+  if (hash === undefined) {
+    throw new Error(`no room key hash registered for roomId ${roomId}`);
+  }
+  return hash;
+}
+
+export function roomUrl(roomId: string): string {
+  return `/online?roomId=${roomId}${getRoomKeyHash(roomId)}`;
+}
+
+export function onlineRoomUrlWithoutKey(roomId: string): string {
+  return `/online?roomId=${roomId}`;
+}
+
+export async function onlineRoomUrlWithWrongKey(roomId: string): Promise<string> {
+  const wrongKey = await exportRoomKey(await generateRoomKey());
+  return `/online?roomId=${roomId}${buildRoomKeyHash(wrongKey)}`;
+}
+
 export async function createOnlineRoom(
   request: APIRequestContext,
 ): Promise<string> {
@@ -70,7 +100,19 @@ export async function createOnlineRoom(
   expect(response.ok()).toBeTruthy();
 
   const body = (await response.json()) as { name: string };
-  return body.name;
+  const roomId = body.name;
+
+  const key = await generateRoomKey();
+  const encodedKey = await exportRoomKey(key);
+  const check = await createRoomKeyCheck(key, roomId);
+
+  const patchResponse = await request.patch(emulatorDatabasePath(`/rooms/${roomId}.json`), {
+    data: { e2ee: { v: 1, check } },
+  });
+  expect(patchResponse.ok()).toBeTruthy();
+
+  roomKeyHashes.set(roomId, buildRoomKeyHash(encodedKey));
+  return roomId;
 }
 
 export type SharedOnlineClients = {
@@ -113,7 +155,7 @@ export async function goToOnlineRoom(
   request: APIRequestContext,
 ): Promise<string> {
   const roomId = await createOnlineRoom(request);
-  await page.goto(`/online?roomId=${roomId}`);
+  await page.goto(roomUrl(roomId));
   await page.waitForURL(new RegExp(`/online\\?roomId=${roomId}`));
   await waitForCanvas(page);
   return roomId;
@@ -123,7 +165,7 @@ export async function openOnlineRoom(
   page: Page,
   roomId: string,
 ): Promise<void> {
-  await page.goto(`/online?roomId=${roomId}`);
+  await page.goto(roomUrl(roomId));
   await page.waitForURL(new RegExp(`/online\\?roomId=${roomId}`));
   await waitForCanvas(page);
 }

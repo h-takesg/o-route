@@ -55,7 +55,9 @@ describe("roomCrypto", () => {
     const envelope = await encryptBytes(key, new Uint8Array([1, 2, 3]), roomId, purpose);
     const parts = envelope.split(".");
     const ciphertext = parts[2]!;
-    const tampered = `${parts[0]}.${parts[1]}.${ciphertext.slice(0, -1)}x`;
+    // The first base64url char carries 6 full bits, so swapping it always changes the bytes.
+    const swapped = ciphertext[0] === "A" ? "B" : "A";
+    const tampered = `${parts[0]}.${parts[1]}.${swapped}${ciphertext.slice(1)}`;
     await expect(decryptBytes(key, tampered, roomId, purpose)).rejects.toThrow();
   });
 
