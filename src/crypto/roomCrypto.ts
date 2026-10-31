@@ -86,12 +86,12 @@ function buildRoomKeyHash(encodedKey: string): string {
   return `#k=${encodedKey}`;
 }
 
-async function encryptBytes(
+async function aesGcmEncrypt(
   key: CryptoKey,
   plaintext: Uint8Array,
   roomId: string,
   purpose: string,
-): Promise<string> {
+): Promise<{ iv: Uint8Array; ciphertext: Uint8Array }> {
   const iv = crypto.getRandomValues(new Uint8Array(AES_GCM_IV_BYTES));
   const aad = buildAad(roomId, purpose);
   const ciphertext = new Uint8Array(
@@ -106,7 +106,69 @@ async function encryptBytes(
       toBufferSource(plaintext),
     ),
   );
+  return { iv, ciphertext };
+}
+
+async function aesGcmDecrypt(
+  key: CryptoKey,
+  iv: Uint8Array,
+  ciphertext: Uint8Array,
+  roomId: string,
+  purpose: string,
+): Promise<Uint8Array> {
+  const aad = buildAad(roomId, purpose);
+  try {
+    const plaintext = await crypto.subtle.decrypt(
+      {
+        name: "AES-GCM",
+        iv: toBufferSource(iv),
+        additionalData: toBufferSource(aad),
+        tagLength: AES_GCM_TAG_BITS,
+      },
+      key,
+      toBufferSource(ciphertext),
+    );
+    return new Uint8Array(plaintext);
+  } catch {
+    throw new Error("Decryption failed");
+  }
+}
+
+async function encryptBytes(
+  key: CryptoKey,
+  plaintext: Uint8Array,
+  roomId: string,
+  purpose: string,
+): Promise<string> {
+  const { iv, ciphertext } = await aesGcmEncrypt(key, plaintext, roomId, purpose);
   return `${ENVELOPE_VERSION}.${bytesToBase64Url(iv)}.${bytesToBase64Url(ciphertext)}`;
+}
+
+async function encryptBinary(
+  key: CryptoKey,
+  plaintext: Uint8Array,
+  roomId: string,
+  purpose: string,
+): Promise<Uint8Array> {
+  const { iv, ciphertext } = await aesGcmEncrypt(key, plaintext, roomId, purpose);
+  const out = new Uint8Array(iv.length + ciphertext.length);
+  out.set(iv, 0);
+  out.set(ciphertext, iv.length);
+  return out;
+}
+
+async function decryptBinary(
+  key: CryptoKey,
+  data: Uint8Array,
+  roomId: string,
+  purpose: string,
+): Promise<Uint8Array> {
+  if (data.length < ENCRYPTION_OVERHEAD_BYTES) {
+    throw new Error("Ciphertext too short");
+  }
+  const iv = data.subarray(0, AES_GCM_IV_BYTES);
+  const ciphertext = data.subarray(AES_GCM_IV_BYTES);
+  return aesGcmDecrypt(key, iv, ciphertext, roomId, purpose);
 }
 
 function parseEnvelope(envelope: string): { iv: Uint8Array; ciphertext: Uint8Array } {
@@ -146,22 +208,7 @@ async function decryptBytes(
   purpose: string,
 ): Promise<Uint8Array> {
   const { iv, ciphertext } = parseEnvelope(envelope);
-  const aad = buildAad(roomId, purpose);
-  try {
-    const plaintext = await crypto.subtle.decrypt(
-      {
-        name: "AES-GCM",
-        iv: toBufferSource(iv),
-        additionalData: toBufferSource(aad),
-        tagLength: AES_GCM_TAG_BITS,
-      },
-      key,
-      toBufferSource(ciphertext),
-    );
-    return new Uint8Array(plaintext);
-  } catch {
-    throw new Error("Decryption failed");
-  }
+  return aesGcmDecrypt(key, iv, ciphertext, roomId, purpose);
 }
 
 async function encryptJson(
@@ -260,9 +307,11 @@ export {
   ROOM_KEY_CHECK_PURPOSE,
   buildRoomKeyHash,
   createRoomKeyCheck,
+  decryptBinary,
   decryptBytes,
   decryptJson,
   decryptNumbers,
+  encryptBinary,
   encryptBytes,
   encryptJson,
   encryptNumbers,
