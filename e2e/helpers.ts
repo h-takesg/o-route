@@ -87,8 +87,10 @@ export async function openSharedOnlineRoom(
   request: APIRequestContext,
 ): Promise<SharedOnlineClients> {
   const roomId = await createOnlineRoom(request);
-  const contextA = await browser.newContext();
-  const contextB = await browser.newContext();
+  // The online toolbar stacks three control groups; the 720px default height pushes "follwer" off-screen.
+  const contextOptions = { viewport: { width: 1280, height: 1000 } };
+  const contextA = await browser.newContext(contextOptions);
+  const contextB = await browser.newContext(contextOptions);
   const pageA = await contextA.newPage();
   const pageB = await contextB.newPage();
   await openOnlineRoom(pageA, roomId);
