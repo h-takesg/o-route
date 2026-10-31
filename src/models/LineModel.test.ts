@@ -103,4 +103,28 @@ describe("Lines", () => {
     expect(updated.lines.has("keep")).toBe(true);
     expect(updated.lines.has("drop")).toBe(false);
   });
+
+  it("appendValues appends multiple coordinates to a line", () => {
+    const line = new DrawLine().addPoint({ x: 1, y: 2 });
+    const lines = new Lines().addLineWithKey("k", line);
+    const updated = lines.appendValues("k", [3, 4, 5]);
+
+    expect(updated.lines.get("k")?.points.toArray()).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it("appendValues is a no-op for missing keys", () => {
+    const lines = new Lines();
+    const updated = lines.appendValues("missing", [1, 2]);
+
+    expect(updated).toBe(lines);
+    expect(lines.lines.size).toBe(0);
+  });
+
+  it("appendValues is a no-op for empty values", () => {
+    const [lines, key] = new Lines().addLine(new DrawLine().addPoint({ x: 0, y: 0 }));
+    const updated = lines.appendValues(key, []);
+
+    expect(updated).toBe(lines);
+    expect(lines.lines.get(key)?.points.toArray()).toEqual([0, 0]);
+  });
 });
