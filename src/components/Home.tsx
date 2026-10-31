@@ -1,10 +1,16 @@
 import { Card, CardContent, Typography } from "@mui/material";
 import { navigate } from "vike/client/router";
 import { useDatabaseRef } from "../hooks/useDatabaseRef";
-import { push, serverTimestamp } from "firebase/database";
+import { push, serverTimestamp, set } from "firebase/database";
 import Markdown from "marked-react";
 import homeDocument from "../documents/home_ja.md?raw";
 import { firebaseApp } from "../firebase";
+import {
+  buildRoomKeyHash,
+  createRoomKeyCheck,
+  exportRoomKey,
+  generateRoomKey,
+} from "../crypto/roomCrypto";
 
 function Home() {
   const roomsRef = useDatabaseRef(firebaseApp, "rooms");
@@ -13,21 +19,39 @@ function Home() {
     navigate("/local");
   };
 
-  const enterNewRoom = () => {
-    const newRoomRef = push(roomsRef, {
-      image: "",
-      lines: {},
-      timestamp: serverTimestamp(),
-    });
-
-    if (newRoomRef.key === null) {
-      alert("新しいルームの作成に失敗しました");
+  const enterNewRoom = async () => {
+    if (globalThis.crypto?.subtle === undefined) {
+      alert("暗号化に対応していない環境です．https もしくは localhost で開いてください");
       return;
     }
 
-    const query = new URLSearchParams([["roomId", newRoomRef.key]]);
+    try {
+      const newRoomRef = push(roomsRef);
 
-    navigate(`/online?${query}`);
+      if (newRoomRef.key === null) {
+        alert("新しいルームの作成に失敗しました");
+        return;
+      }
+
+      const roomId = newRoomRef.key;
+      const key = await generateRoomKey();
+      const encodedKey = await exportRoomKey(key);
+      const check = await createRoomKeyCheck(key, roomId);
+
+      set(newRoomRef, {
+        image: "",
+        lines: {},
+        timestamp: serverTimestamp(),
+        e2ee: { v: 1, check },
+      }).catch(() => {
+        alert("新しいルームの作成に失敗しました");
+      });
+
+      const query = new URLSearchParams([["roomId", roomId]]);
+      navigate(`/online?${query}${buildRoomKeyHash(encodedKey)}`);
+    } catch {
+      alert("新しいルームの作成に失敗しました");
+    }
   };
 
   return (
