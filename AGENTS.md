@@ -72,7 +72,7 @@
 │   ├── models/             # ViewModel, DrawLine, Lines, ChunkAssembler
 │   ├── hooks/              # useDatabaseRef, useWindowSize, useOnlineLines 等
 │   ├── renderer/           # SSR / クライアントハイドレーション
-│   ├── documents/          # home_ja.md（ホーム画面 Markdown）
+│   ├── components/home/    # ランディング（Hero, ModeCards, FeatureSection 等）
 │   ├── firebase.ts         # Firebase 初期化（Emulator 接続含む）
 │   ├── math.ts             # Vector, 線分交差判定
 │   └── types.ts            # Mode, ViewMode, LineOpacity
@@ -365,7 +365,7 @@ firebase deploy --only storage,hosting
 Emulator では CORS 不要（E2E で確認済み）。
 
 - Firebase 設定（apiKey 等）は `src/firebase.ts` に直書き（クライアントアプリとして一般的）
-- 機微データの投入は想定外（`home_ja.md` にも明記）。E2EE でもメタデータは漏れる
+- 機微データの投入は想定外（ホームの注意欄にも同旨）。E2EE でもメタデータは漏れる
 
 ---
 

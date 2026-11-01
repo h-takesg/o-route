@@ -32,7 +32,7 @@ async function render(pageContext: PageContextServer) {
           }
         </script>
         <title>O-Route | オリエンテーリング向けオンラインホワイトボード</title>
-        <meta name="description" content="オリエンテーリングの地図読みに使えるオンラインホワイトボード．読み込んだ画像を回転させながらルートを書き込めます．"/>
+        <meta name="description" content="オリエンテーリングの地図読みに使えるオンラインホワイトボード。読み込んだ画像を回転させながらルートを書き込めます。"/>
       </head>
       <body>
         <div id="root">${dangerouslySkipEscape(pageHtml)}</div>

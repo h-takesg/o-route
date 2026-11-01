@@ -1,9 +1,7 @@
-import { Card, CardContent, Typography } from "@mui/material";
+import { Box } from "@mui/material";
 import { navigate } from "vike/client/router";
 import { useDatabaseRef } from "../hooks/useDatabaseRef";
 import { push, serverTimestamp, set } from "firebase/database";
-import Markdown from "marked-react";
-import homeDocument from "../documents/home_ja.md?raw";
 import { firebaseApp } from "../firebase";
 import {
   buildRoomKeyHash,
@@ -11,6 +9,11 @@ import {
   exportRoomKey,
   generateRoomKey,
 } from "../crypto/roomCrypto";
+import { ControlsTable } from "./home/ControlsTable";
+import { FeatureSection } from "./home/FeatureSection";
+import { HomeFooter } from "./home/HomeFooter";
+import { HomeHero } from "./home/HomeHero";
+import { ModeCards } from "./home/ModeCards";
 
 function Home() {
   const roomsRef = useDatabaseRef(firebaseApp, "rooms");
@@ -21,7 +24,7 @@ function Home() {
 
   const enterNewRoom = async () => {
     if (globalThis.crypto?.subtle === undefined) {
-      alert("暗号化に対応していない環境です．https もしくは localhost で開いてください");
+      alert("暗号化に対応していない環境です。https もしくは localhost で開いてください");
       return;
     }
 
@@ -55,82 +58,21 @@ function Home() {
   };
 
   return (
-    <div
-      style={{
-        margin: "3rem auto",
+    <Box
+      component="main"
+      sx={{
+        mx: "auto",
         width: "90%",
-        maxWidth: "40rem",
+        maxWidth: "64rem",
+        py: { xs: 3, md: 4 },
       }}
     >
-      <h1>O-Route</h1>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "row",
-          justifyContent: "space-between",
-          wordBreak: "keep-all",
-          overflowWrap: "anywhere",
-        }}
-      >
-        <Card
-          data-testid="enter-local"
-          sx={{
-            width: "45%",
-            margin: "1rem auto",
-          }}
-          elevation={4}
-          onClick={enterLocalRoom}
-        >
-          <CardContent>
-            <Typography variant="h5" component="div">
-              ローカル
-              <wbr />
-              モード
-            </Typography>
-            <Typography variant="body2">
-              ひとりで使う
-              <br />
-              端末上に保存
-              <br />
-              タブを閉じる or 更新するまで有効
-              <br />
-            </Typography>
-            <Typography align="center" color="primary">
-              ENTER
-            </Typography>
-          </CardContent>
-        </Card>
-        <Card
-          data-testid="enter-online"
-          sx={{
-            width: "45%",
-            margin: "1rem auto",
-          }}
-          elevation={4}
-          onClick={enterNewRoom}
-        >
-          <CardContent>
-            <Typography variant="h5" component="div">
-              オンライン
-              <wbr />
-              モード
-            </Typography>
-            <Typography variant="body2">
-              みんなで使う
-              <br />
-              サーバー上に保存
-              <br />
-              24時間有効
-              <br />
-            </Typography>
-            <Typography align="center" color="primary">
-              ENTER
-            </Typography>
-          </CardContent>
-        </Card>
-      </div>
-      <Markdown value={homeDocument} />
-    </div>
+      <HomeHero onEnterLocal={enterLocalRoom} onEnterOnline={enterNewRoom} />
+      <ModeCards onEnterLocal={enterLocalRoom} onEnterOnline={enterNewRoom} />
+      <FeatureSection />
+      <ControlsTable />
+      <HomeFooter />
+    </Box>
   );
 }
 
