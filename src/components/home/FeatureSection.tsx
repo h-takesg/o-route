@@ -24,8 +24,8 @@ function FeatureSection() {
             </Typography>
             <FramedScreenshot
               src="/images/home/rotate.webp"
-              width={800}
-              height={600}
+              width={1152}
+              height={864}
               alt="地図の移動・拡大・回転の操作例"
             />
           </CardContent>
@@ -40,8 +40,8 @@ function FeatureSection() {
             </Typography>
             <FramedScreenshot
               src="/images/home/draw-erase.webp"
-              width={800}
-              height={600}
+              width={1152}
+              height={864}
               alt="描画と消しゴムの操作例"
             />
           </CardContent>
@@ -56,8 +56,8 @@ function FeatureSection() {
             </Typography>
             <FramedScreenshot
               src="/images/home/opacity.webp"
-              width={800}
-              height={600}
+              width={1152}
+              height={864}
               alt="線の表示切替の例"
             />
           </CardContent>
@@ -72,8 +72,8 @@ function FeatureSection() {
             </Typography>
             <FramedScreenshot
               src="/images/home/view-sharing.webp"
-              width={1600}
-              height={600}
+              width={2312}
+              height={864}
               alt="視点共有の操作例"
             />
           </CardContent>

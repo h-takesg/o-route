@@ -18,6 +18,8 @@
     "emulators": "firebase emulators:start --only database,storage",
     "dev:emulator": "firebase emulators:exec --only database,storage --ui 'VITE_USE_FIREBASE_EMULATOR=true npm run dev'",
     "e2e:server": "firebase emulators:exec --only database,storage 'VITE_USE_FIREBASE_EMULATOR=true vite --host --port 3000'",
+    "screenshots": "playwright test -c playwright.screenshots.config.ts",
+    "typecheck:screenshots": "tsc -p tsconfig.screenshots.json",
     "screenshots:map": "node scripts/screenshots/generate-sample-map.mjs"
   },
   "dependencies": {

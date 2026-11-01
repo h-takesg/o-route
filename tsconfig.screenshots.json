@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": [
+    "scripts/screenshots/**/*.ts",
+    "playwright.screenshots.config.ts",
+    "e2e/helpers.ts",
+    "src/crypto/roomCrypto.ts"
+  ]
+}

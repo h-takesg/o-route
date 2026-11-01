@@ -42,8 +42,8 @@ function HomeHero({ onEnterLocal, onEnterOnline }: Props) {
       </Stack>
       <FramedScreenshot
         src="/images/home/hero.webp"
-        width={1280}
-        height={800}
+        width={1440}
+        height={900}
         alt="O-Route の画面。地図画像の上に線が描かれ、ツールバーが表示されている。"
         loading="eager"
       />
