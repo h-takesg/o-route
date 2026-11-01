@@ -2,7 +2,8 @@
  * Deterministic fictional ISOM-style sample map (SVG → PNG via Playwright).
  * Terrain is authored with explicit geometry; noise perturbs edges only.
  */
-import { writeFileSync } from "node:fs";
+import { writeFileSync, mkdirSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
@@ -13,6 +14,81 @@ const WIDTH = 2400;
 const HEIGHT = 1700;
 /** Fixed seed — byte-identical output on every run. */
 const MAP_SEED = 0x4f524f55;
+
+/**
+ * Map drawn at 1:10000; symbol dimensions = ISOM 2017-2 @ 1:15000 × 1.5 (IOF ISOM 2017-2).
+ * 100 m on ground = 10 mm on map → scale bar length 10 × PX_PER_MM px (100 px at PX_PER_MM=10).
+ */
+const PX_PER_MM = 10;
+const mm = (mmAt15000) => mmAt15000 * 1.5 * PX_PER_MM;
+
+/**
+ * Screen sRGB from OpenOrienteering/mapper `symbol sets/src/ISOM 2017-2_15000.xmap`
+ * (blob 8eb3af0e6675fa4dde498a2212e10b526e75e7ea, master 2026). `<rgb>` on spot inks with
+ * method="cmyk" is not screen-accurate; Blue/Green/Purple use FOGRA39-style sRGB (IOF PMS).
+ */
+function oomRgb(r, g, b) {
+  return `#${[r, g, b]
+    .map((v) => Math.round(v * 255).toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+
+function mixWhiteHex(hex, whiteFraction) {
+  const n = hex.replace("#", "");
+  const r = parseInt(n.slice(0, 2), 16);
+  const g = parseInt(n.slice(2, 4), 16);
+  const b = parseInt(n.slice(4, 6), 16);
+  const t = whiteFraction;
+  const mix = (c) => Math.round(c * (1 - t) + 255 * t);
+  return `#${[mix(r), mix(g), mix(b)].map((v) => v.toString(16).padStart(2, "0")).join("")}`;
+}
+
+const FOGRA_SCREEN = {
+  BLUE: "#009fe3",
+  GREEN: "#3fa535",
+  PURPLE: "#b04a94",
+};
+
+const ISOM = {
+  BLACK: oomRgb(0, 0, 0),
+  BLUE: FOGRA_SCREEN.BLUE,
+  BLUE_50: mixWhiteHex(FOGRA_SCREEN.BLUE, 0.5),
+  BLUE_30: mixWhiteHex(FOGRA_SCREEN.BLUE, 0.7),
+  YELLOW: oomRgb(1, 0.73, 0.21),
+  YELLOW_50: oomRgb(1, 0.865, 0.605),
+  GREEN: FOGRA_SCREEN.GREEN,
+  GREEN_50: mixWhiteHex(FOGRA_SCREEN.GREEN, 0.4),
+  GREEN_30: mixWhiteHex(FOGRA_SCREEN.GREEN, 0.7),
+  BROWN: oomRgb(0.82, 0.361, 0),
+  BROWN_50: oomRgb(0.91, 0.68, 0.5),
+  PURPLE: FOGRA_SCREEN.PURPLE,
+  WHITE: "#ffffff",
+};
+
+/** Line widths from OOM ISOM 2017-2_15000.xmap symbols 101/102/304/506/504/503/601.2/705. */
+const STROKE = {
+  contour: mm(0.14),
+  contourIndex: mm(0.25),
+  stream: mm(0.3),
+  path: mm(0.18),
+  track: mm(0.35),
+  roadOutline: mm(0.35),
+  northLine: mm(0.1),
+  overprint: mm(0.35),
+  marshDash: mm(0.18),
+};
+
+const ROAD_FILL_W = mm(1.2);
+/** Course overprint 703/705/706/704 @ 1:15000 (×1.5 for 1:10000). */
+const CONTROL_R = (5.0 * 1.5 * PX_PER_MM) / 2;
+const FINISH_INNER_R = (5.0 * 1.5 * PX_PER_MM) / 2;
+const FINISH_OUTER_R = (7.0 * 1.5 * PX_PER_MM) / 2;
+const START_TRI_SIDE = 6.0 * 1.5 * PX_PER_MM;
+const CONTROL_NUM_PX = mm(4.0);
+const SCALE_BAR_M = 100;
+const SCALE_BAR_PX = (SCALE_BAR_M / 10000) * 1000 * PX_PER_MM;
+
+const MULTIPLY = 'style="mix-blend-mode:multiply"';
 
 function hash2i(x, y, salt) {
   let h = (x * 374761393 + y * 668265263 + salt * 1442695041 + MAP_SEED) >>> 0;
@@ -480,25 +556,26 @@ function segmentIntersect(a, b, c, d) {
 }
 
 function triangleExitPoint(apex, bl, br, target) {
-  const cx = (apex[0] + bl[0] + br[0]) / 3;
-  const cy = (apex[1] + bl[1] + br[1]) / 3;
-  const edges = [
-    [apex, bl],
-    [bl, br],
-    [br, apex],
-  ];
-  let best = null;
-  let bestT = Infinity;
-  for (const [e0, e1] of edges) {
-    const hit = segmentIntersect([cx, cy], target, e0, e1);
-    if (!hit) continue;
-    const t = Math.hypot(hit[0] - cx, hit[1] - cy);
-    if (t < bestT) {
-      bestT = t;
-      best = hit;
-    }
-  }
-  return best || apex;
+  const baseMid = [(bl[0] + br[0]) / 2, (bl[1] + br[1]) / 2];
+  return baseMid;
+}
+
+/** Equilateral start triangle (701): centroid at start, apex toward first control. */
+function startTriangleToward(start, control1, sidePx) {
+  const side = sidePx;
+  const h = side * (Math.sqrt(3) / 2);
+  const dx = control1[0] - start[0];
+  const dy = control1[1] - start[1];
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
+  const px = -uy;
+  const py = ux;
+  const apex = [start[0] + ux * ((2 * h) / 3), start[1] + uy * ((2 * h) / 3)];
+  const baseMid = [start[0] - ux * (h / 3), start[1] - uy * (h / 3)];
+  const bl = [baseMid[0] + px * (side / 2), baseMid[1] + py * (side / 2)];
+  const br = [baseMid[0] - px * (side / 2), baseMid[1] - py * (side / 2)];
+  return { apex, bl, br, baseMid };
 }
 
 function distPointToSegment(p, a, b) {
@@ -676,7 +753,7 @@ function buildSvg() {
   }
 
   const parts = [];
-  parts.push(`<rect width="${WIDTH}" height="${HEIGHT}" fill="#FFFFFF"/>`);
+  parts.push(`<rect width="${WIDTH}" height="${HEIGHT}" fill="${ISOM.WHITE}"/>`);
   parts.push(landClipPathDef(lakePts));
   parts.push(`<g clip-path="url(#landClip)">`);
 
@@ -688,40 +765,40 @@ function buildSvg() {
   ];
 
   const vegPatches = [
-    { cx: 1260, cy: 740, rx: 280, ry: 58, rot: 0.52, color: "#C5FFB9", a2: 0.1, phi2: 0.2 },
-    { cx: 1310, cy: 810, rx: 210, ry: 48, rot: 0.48, color: "#C5FFB9" },
-    { cx: 1180, cy: 880, rx: 150, ry: 44, rot: 0.45, color: "#C5FFB9" },
-    { cx: 1000, cy: 1010, rx: 130, ry: 72, rot: 0.2, color: "#C5FFB9" },
+    { cx: 1260, cy: 740, rx: 280, ry: 58, rot: 0.52, color: ISOM.GREEN_30, a2: 0.1, phi2: 0.2 },
+    { cx: 1310, cy: 810, rx: 210, ry: 48, rot: 0.48, color: ISOM.GREEN_30 },
+    { cx: 1180, cy: 880, rx: 150, ry: 44, rot: 0.45, color: ISOM.GREEN_30 },
+    { cx: 1000, cy: 1010, rx: 130, ry: 72, rot: 0.2, color: ISOM.GREEN_30 },
     {
       cx: 540,
       cy: 710,
       rx: 118,
       ry: 78,
       rot: -0.35,
-      color: "#C5FFB9",
-      core: "#8BFF74",
+      color: ISOM.GREEN_30,
+      core: ISOM.GREEN_50,
       coreScale: 0.58,
     },
-    { cx: 1860, cy: 870, rx: 105, ry: 68, rot: 0.25, color: "#8BFF74" },
-    { cx: 1460, cy: 510, rx: 92, ry: 62, rot: 0.12, color: "#C5FFB9" },
+    { cx: 1860, cy: 870, rx: 105, ry: 68, rot: 0.25, color: ISOM.GREEN_50 },
+    { cx: 1460, cy: 510, rx: 92, ry: 62, rot: 0.12, color: ISOM.GREEN_30 },
     {
       cx: 900,
       cy: 470,
       rx: 82,
       ry: 52,
       rot: 0.55,
-      color: "#C5FFB9",
-      core: "#3DFF17",
+      color: ISOM.GREEN_30,
+      core: ISOM.GREEN,
       coreScale: 0.48,
     },
-    { cx: 1220, cy: 1260, rx: 105, ry: 58, rot: -0.15, color: "#C5FFB9" },
-    { cx: 660, cy: 960, rx: 98, ry: 52, rot: 0.55, color: "#8BFF74" },
+    { cx: 1220, cy: 1260, rx: 105, ry: 58, rot: -0.15, color: ISOM.GREEN_30 },
+    { cx: 660, cy: 960, rx: 98, ry: 52, rot: 0.55, color: ISOM.GREEN_50 },
   ];
 
   for (const p of openPatches.filter((o) => o.rough)) {
     const poly = irregularPatch(p.cx, p.cy, p.rx + 20, p.ry + 14, p.rot, 501, { a2: 0.16, a3: 0.1 });
     if (!pointInPolygon(p.cx, p.cy, lakePts)) {
-      parts.push(`<path d="${polylinePath(poly, true)}" fill="#FFDD9A" stroke="none"/>`);
+      parts.push(`<path d="${polylinePath(poly, true)}" fill="${ISOM.YELLOW_50}" stroke="none"/>`);
     }
   }
   for (const p of openPatches.filter((o) => !o.rough)) {
@@ -731,7 +808,7 @@ function buildSvg() {
       phi2: p.rot,
     });
     if (!pointInPolygon(p.cx, p.cy, lakePts)) {
-      parts.push(`<path d="${polylinePath(poly, true)}" fill="#FFBA36" stroke="none"/>`);
+      parts.push(`<path d="${polylinePath(poly, true)}" fill="${ISOM.YELLOW}" stroke="none"/>`);
     }
   }
   for (const p of vegPatches) {
@@ -754,8 +831,10 @@ function buildSvg() {
   parts.push(`</g>`);
 
   parts.push(
-    `<polygon points="${polygonPoints(lakePts)}" fill="#00A0E1" fill-opacity="0.6" stroke="none"/>`,
+    `<polygon points="${polygonPoints(lakePts)}" fill="${ISOM.BLUE_50}" stroke="none"/>`,
   );
+
+  parts.push(`<g ${MULTIPLY}>`);
 
   function intersectsLake(poly) {
     for (const p of poly) {
@@ -769,7 +848,7 @@ function buildSvg() {
     const segs = contourSegmentsOnGrid(hGrid, HEIGHT_GRID_W, HEIGHT_GRID_H, level, WIDTH, HEIGHT);
     const lines = joinSegments(segs);
     const isIndex = (li + 1) % 5 === 0;
-    const strokeW = isIndex ? 3.5 : 2;
+    const strokeW = isIndex ? STROKE.contourIndex : STROKE.contour;
     for (let poly of lines) {
       const gap = Math.hypot(
         poly[0][0] - poly[poly.length - 1][0],
@@ -786,19 +865,19 @@ function buildSvg() {
       poly = processContourLine(poly, closed);
       if (intersectsLake(poly)) continue;
       parts.push(
-        `<path d="${polylinePath(poly, closed)}" fill="none" stroke="#D15C00" stroke-width="${strokeW}" stroke-linejoin="round" stroke-linecap="round"/>`,
+        `<path d="${polylinePath(poly, closed)}" fill="none" stroke="${ISOM.BROWN}" stroke-width="${strokeW}" stroke-linejoin="round" stroke-linecap="round"/>`,
       );
     }
   }
 
   for (let x = 125; x < WIDTH; x += 250) {
     parts.push(
-      `<line x1="${x}" y1="0" x2="${x}" y2="${HEIGHT}" stroke="#00A0E1" stroke-width="1.5" opacity="0.65"/>`,
+      `<line x1="${x}" y1="0" x2="${x}" y2="${HEIGHT}" stroke="${ISOM.BLUE_30}" stroke-width="${STROKE.northLine}"/>`,
     );
   }
 
   parts.push(
-    `<polygon points="${polygonPoints(lakePts)}" fill="none" stroke="#00A0E1" stroke-width="2.5"/>`,
+    `<polygon points="${polygonPoints(lakePts)}" fill="none" stroke="${ISOM.BLUE}" stroke-width="${STROKE.stream}"/>`,
   );
 
   const inflowShore = northLakeShorePoint(lakePts);
@@ -816,7 +895,7 @@ function buildSvg() {
   const inflowBody = inflowWps.slice(0, -1);
   const inflowD = `${catmullRomPath(inflowBody)} L${inflowShore[0].toFixed(1)},${inflowShore[1].toFixed(1)}`;
   parts.push(
-    `<path d="${inflowD}" fill="none" stroke="#00A0E1" stroke-width="2.5" stroke-linecap="round"/>`,
+    `<path d="${inflowD}" fill="none" stroke="${ISOM.BLUE}" stroke-width="${STROKE.stream}" stroke-linecap="round"/>`,
   );
 
   const outflowShore = lakeShorePoint(lakePts, basinCy + 130, basinCx);
@@ -827,7 +906,7 @@ function buildSvg() {
     [1095, 1675],
   ];
   parts.push(
-    `<path d="${catmullRomPath(outflowWps)}" fill="none" stroke="#00A0E1" stroke-width="2.5" stroke-linecap="round"/>`,
+    `<path d="${catmullRomPath(outflowWps)}" fill="none" stroke="${ISOM.BLUE}" stroke-width="${STROKE.stream}" stroke-linecap="round"/>`,
   );
 
   let marshY = inflowShore[1] - 32;
@@ -838,7 +917,7 @@ function buildSvg() {
   for (let mx = marshCx - 55; mx < marshCx + 45; mx += 22) {
     if (pointInPolygon(mx, marshY, lakePts)) continue;
     parts.push(
-      `<line x1="${mx.toFixed(0)}" y1="${marshY.toFixed(0)}" x2="${(mx + 14).toFixed(0)}" y2="${marshY.toFixed(0)}" stroke="#00A0E1" stroke-width="2.2" stroke-linecap="round"/>`,
+      `<line x1="${mx.toFixed(0)}" y1="${marshY.toFixed(0)}" x2="${(mx + 14).toFixed(0)}" y2="${marshY.toFixed(0)}" stroke="${ISOM.BLUE}" stroke-width="${STROKE.marshDash}" stroke-linecap="round"/>`,
     );
   }
 
@@ -855,14 +934,15 @@ function buildSvg() {
     [2280, 762],
   ];
   const roadD = catmullRomPath(roadPts);
+  const roadHalf = ROAD_FILL_W / 2;
   parts.push(
-    `<path d="${roadD}" fill="none" stroke="#FFBA36" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>`,
+    `<path d="${roadD}" fill="none" stroke="${ISOM.BROWN_50}" stroke-width="${ROAD_FILL_W}" stroke-linecap="round" stroke-linejoin="round"/>`,
   );
   parts.push(
-    `<path d="${catmullRomPath(offsetPolyline(roadPts, 5.5))}" fill="none" stroke="#000000" stroke-width="2.2" stroke-linecap="round"/>`,
+    `<path d="${catmullRomPath(offsetPolyline(roadPts, roadHalf))}" fill="none" stroke="${ISOM.BLACK}" stroke-width="${STROKE.roadOutline}" stroke-linecap="round"/>`,
   );
   parts.push(
-    `<path d="${catmullRomPath(offsetPolyline(roadPts, -5.5))}" fill="none" stroke="#000000" stroke-width="2.2" stroke-linecap="round"/>`,
+    `<path d="${catmullRomPath(offsetPolyline(roadPts, -roadHalf))}" fill="none" stroke="${ISOM.BLACK}" stroke-width="${STROKE.roadOutline}" stroke-linecap="round"/>`,
   );
 
   const trackA = [
@@ -885,7 +965,7 @@ function buildSvg() {
   for (const t of [trackA, trackB, trackC]) {
     if (pathClearOfLake(t, lakePts)) {
       parts.push(
-        `<path d="${catmullRomPath(t)}" fill="none" stroke="#000000" stroke-width="2.5" stroke-linecap="round"/>`,
+        `<path d="${catmullRomPath(t)}" fill="none" stroke="${ISOM.BLACK}" stroke-width="${STROKE.track}" stroke-linecap="round"/>`,
       );
     }
   }
@@ -901,7 +981,7 @@ function buildSvg() {
     [1320, 1060],
   ].filter((p) => !pointInPolygon(p[0], p[1], lakePts));
   parts.push(
-    `<path d="${catmullRomPath(lakeShorePath)}" fill="none" stroke="#000000" stroke-width="2.5" stroke-dasharray="10 9" stroke-linecap="round"/>`,
+    `<path d="${catmullRomPath(lakeShorePath)}" fill="none" stroke="${ISOM.BLACK}" stroke-width="${STROKE.path}" stroke-dasharray="${(STROKE.path * 4).toFixed(1)} ${(STROKE.path * 3.6).toFixed(1)}" stroke-linecap="round"/>`,
   );
 
   const smallPathA = [
@@ -917,7 +997,7 @@ function buildSvg() {
   for (const p of [smallPathA, smallPathB]) {
     if (pathClearOfLake(p, lakePts)) {
       parts.push(
-        `<path d="${catmullRomPath(p)}" fill="none" stroke="#000000" stroke-width="2.5" stroke-dasharray="8 8" stroke-linecap="round"/>`,
+        `<path d="${catmullRomPath(p)}" fill="none" stroke="${ISOM.BLACK}" stroke-width="${STROKE.path}" stroke-dasharray="${(STROKE.path * 3.2).toFixed(1)} ${(STROKE.path * 3.2).toFixed(1)}" stroke-linecap="round"/>`,
       );
     }
   }
@@ -929,7 +1009,7 @@ function buildSvg() {
   ];
   if (pathClearOfLake(pathToBuildings, lakePts)) {
     parts.push(
-      `<path d="${catmullRomPath(pathToBuildings)}" fill="none" stroke="#000000" stroke-width="2.5" stroke-linecap="round"/>`,
+      `<path d="${catmullRomPath(pathToBuildings)}" fill="none" stroke="${ISOM.BLACK}" stroke-width="${STROKE.path}" stroke-linecap="round"/>`,
     );
   }
 
@@ -939,7 +1019,7 @@ function buildSvg() {
     [848, 808, 32, 26],
   ];
   for (const [bx, by, bw, bh] of buildings) {
-    parts.push(`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="#000000"/>`);
+    parts.push(`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="${ISOM.BLACK}"/>`);
   }
 
   const boulders = [
@@ -953,7 +1033,7 @@ function buildSvg() {
     [820, 640],
   ];
   for (const [bx, by] of boulders) {
-    parts.push(`<circle cx="${bx}" cy="${by}" r="3" fill="#000000"/>`);
+    parts.push(`<circle cx="${bx}" cy="${by}" r="${STROKE.path}" fill="${ISOM.BLACK}"/>`);
   }
 
   const knolls = [
@@ -962,7 +1042,7 @@ function buildSvg() {
     [1720, 1320],
   ];
   for (const [kx, ky] of knolls) {
-    parts.push(`<circle cx="${kx}" cy="${ky}" r="4" fill="#D15C00"/>`);
+    parts.push(`<circle cx="${kx}" cy="${ky}" r="${STROKE.contourIndex}" fill="${ISOM.BROWN}"/>`);
   }
 
   const cliffPts = [
@@ -972,7 +1052,7 @@ function buildSvg() {
     [640, 640],
   ];
   parts.push(
-    `<path d="${catmullRomPath(cliffPts)}" fill="none" stroke="#000000" stroke-width="2.8" stroke-linecap="round"/>`,
+    `<path d="${catmullRomPath(cliffPts)}" fill="none" stroke="${ISOM.BLACK}" stroke-width="${STROKE.track}" stroke-linecap="round"/>`,
   );
   for (let ci = 0; ci < cliffPts.length - 1; ci++) {
     const p = cliffPts[ci];
@@ -983,7 +1063,7 @@ function buildSvg() {
     const tx = (-dy / len) * 12;
     const ty = (dx / len) * 12;
     parts.push(
-      `<line x1="${(p[0] + tx).toFixed(1)}" y1="${(p[1] + ty).toFixed(1)}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}" stroke="#000000" stroke-width="2"/>`,
+      `<line x1="${(p[0] + tx).toFixed(1)}" y1="${(p[1] + ty).toFixed(1)}" x2="${p[0].toFixed(1)}" y2="${p[1].toFixed(1)}" stroke="${ISOM.BLACK}" stroke-width="${STROKE.path}"/>`,
     );
   }
 
@@ -993,25 +1073,20 @@ function buildSvg() {
     [1680, 640],
   ];
   parts.push(
-    `<path d="${catmullRomPath(cliffPts2)}" fill="none" stroke="#000000" stroke-width="2.8" stroke-linecap="round"/>`,
+    `<path d="${catmullRomPath(cliffPts2)}" fill="none" stroke="${ISOM.BLACK}" stroke-width="${STROKE.track}" stroke-linecap="round"/>`,
   );
   for (const p of cliffPts2) {
     parts.push(
-      `<line x1="${p[0].toFixed(1)}" y1="${p[1].toFixed(1)}" x2="${(p[0] + 10).toFixed(1)}" y2="${(p[1] + 12).toFixed(1)}" stroke="#000000" stroke-width="2"/>`,
+      `<line x1="${p[0].toFixed(1)}" y1="${p[1].toFixed(1)}" x2="${(p[0] + 10).toFixed(1)}" y2="${(p[1] + 12).toFixed(1)}" stroke="${ISOM.BLACK}" stroke-width="${STROKE.path}"/>`,
     );
   }
 
-  const overprint = "#CD3FA0";
-  const controlR = 38;
-  const legStroke = 4;
-  const finishOuterR = controlR + 10;
+  parts.push(`</g>`);
+
+  const overprint = ISOM.PURPLE;
+  const legStroke = STROKE.overprint;
 
   const start = [380, 580];
-  const triSize = 34;
-  const triApex = [start[0], start[1] - triSize];
-  const triBl = [start[0] - triSize * 0.866, start[1] + triSize / 2];
-  const triBr = [start[0] + triSize * 0.866, start[1] + triSize / 2];
-
   const controls = [
     [620, 310],
     [830, 560],
@@ -1023,6 +1098,12 @@ function buildSvg() {
   ];
   const finish = [1900, 1380];
   const course = [start, ...controls, finish];
+
+  const { apex: triApex, bl: triBl, br: triBr } = startTriangleToward(start, controls[0], START_TRI_SIDE);
+
+  const controlR = CONTROL_R;
+  const finishOuterR = FINISH_OUTER_R;
+  const innerFinishR = FINISH_INNER_R;
 
   const legSegments = buildLegSegments(
     course,
@@ -1043,6 +1124,7 @@ function buildSvg() {
   });
   validateCourseGeometry(controls, legSegments, controlR, labelPositions);
 
+  parts.push(`<g ${MULTIPLY}>`);
   for (const leg of legSegments) {
     parts.push(
       `<path d="M${leg.p0[0].toFixed(1)},${leg.p0[1].toFixed(1)} L${leg.p1[0].toFixed(1)},${leg.p1[1].toFixed(1)}" fill="none" stroke="${overprint}" stroke-width="${legStroke}" stroke-linecap="round"/>`,
@@ -1050,7 +1132,7 @@ function buildSvg() {
   }
 
   parts.push(
-    `<polygon points="${triApex[0]},${triApex[1]} ${triBl[0]},${triBl[1]} ${triBr[0]},${triBr[1]}" fill="none" stroke="${overprint}" stroke-width="${legStroke}" stroke-linejoin="round"/>`,
+    `<polygon points="${triApex[0].toFixed(1)},${triApex[1].toFixed(1)} ${triBl[0].toFixed(1)},${triBl[1].toFixed(1)} ${triBr[0].toFixed(1)},${triBr[1].toFixed(1)}" fill="none" stroke="${overprint}" stroke-width="${legStroke}" stroke-linejoin="round"/>`,
   );
 
   controls.forEach((c, idx) => {
@@ -1060,38 +1142,58 @@ function buildSvg() {
       `<circle cx="${c[0]}" cy="${c[1]}" r="${controlR}" fill="none" stroke="${overprint}" stroke-width="${legStroke}"/>`,
     );
     parts.push(
-      `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" font-family="Arial, Helvetica, sans-serif" font-size="44" font-weight="bold" fill="${overprint}">${num}</text>`,
+      `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" font-family="Arial, Helvetica, sans-serif" font-size="${CONTROL_NUM_PX}" font-weight="bold" fill="${overprint}">${num}</text>`,
     );
   });
 
   parts.push(
     `<circle cx="${finish[0]}" cy="${finish[1]}" r="${finishOuterR}" fill="none" stroke="${overprint}" stroke-width="${legStroke}"/>`,
-    `<circle cx="${finish[0]}" cy="${finish[1]}" r="${controlR - 4}" fill="none" stroke="${overprint}" stroke-width="${legStroke}"/>`,
+    `<circle cx="${finish[0]}" cy="${finish[1]}" r="${innerFinishR}" fill="none" stroke="${overprint}" stroke-width="${legStroke}"/>`,
   );
+  parts.push(`</g>`);
 
   const label = "O-Route サンプル地図（架空）";
   const labelX = 40;
   const labelY = HEIGHT - 44;
   parts.push(
-    `<rect x="${labelX}" y="${labelY - 48}" width="480" height="56" fill="#FFFFFF" stroke="#CCCCCC" stroke-width="1"/>`,
-    `<text x="${labelX + 14}" y="${labelY}" font-family="Arial, Helvetica, sans-serif" font-size="28" fill="#000000">${escapeXml(label)}</text>`,
+    `<rect x="${labelX}" y="${labelY - 48}" width="480" height="56" fill="${ISOM.WHITE}" stroke="#CCCCCC" stroke-width="1"/>`,
+    `<text x="${labelX + 14}" y="${labelY}" font-family="Arial, Helvetica, sans-serif" font-size="28" fill="${ISOM.BLACK}">${escapeXml(label)}</text>`,
   );
 
   const scaleX = WIDTH - 320;
   const scaleY = HEIGHT - 48;
-  const scaleLen = 200;
+  const scaleLen = SCALE_BAR_PX;
   parts.push(
-    `<rect x="${scaleX - 10}" y="${scaleY - 36}" width="${scaleLen + 80}" height="40" fill="#FFFFFF"/>`,
-    `<line x1="${scaleX}" y1="${scaleY}" x2="${scaleX + scaleLen}" y2="${scaleY}" stroke="#000000" stroke-width="3"/>`,
-    `<line x1="${scaleX}" y1="${scaleY - 8}" x2="${scaleX}" y2="${scaleY + 8}" stroke="#000000" stroke-width="2"/>`,
-    `<line x1="${scaleX + scaleLen}" y1="${scaleY - 8}" x2="${scaleX + scaleLen}" y2="${scaleY + 8}" stroke="#000000" stroke-width="2"/>`,
-    `<text x="${scaleX + scaleLen / 2 - 36}" y="${scaleY - 14}" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="#000000">100 m</text>`,
+    `<rect x="${scaleX - 10}" y="${scaleY - 36}" width="${scaleLen + 80}" height="40" fill="${ISOM.WHITE}"/>`,
+    `<line x1="${scaleX}" y1="${scaleY}" x2="${scaleX + scaleLen}" y2="${scaleY}" stroke="${ISOM.BLACK}" stroke-width="${STROKE.contourIndex}"/>`,
+    `<line x1="${scaleX}" y1="${scaleY - 8}" x2="${scaleX}" y2="${scaleY + 8}" stroke="${ISOM.BLACK}" stroke-width="${STROKE.contour}"/>`,
+    `<line x1="${scaleX + scaleLen}" y1="${scaleY - 8}" x2="${scaleX + scaleLen}" y2="${scaleY + 8}" stroke="${ISOM.BLACK}" stroke-width="${STROKE.contour}"/>`,
+    `<text x="${scaleX + scaleLen / 2 - 36}" y="${scaleY - 14}" font-family="Arial, Helvetica, sans-serif" font-size="22" fill="${ISOM.BLACK}">100 m</text>`,
   );
 
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">
 ${parts.join("\n")}
 </svg>`;
+}
+
+async function captureVerificationCrops(page) {
+  const outDir = join(OUT_DIR, "..", "..", "test-results", "map-verify");
+  mkdirSync(outDir, { recursive: true });
+  const crops = [
+    { name: "start-triangle", x: 280, y: 480, width: 220, height: 220 },
+    { name: "control-purple-blend", x: 560, y: 240, width: 200, height: 200 },
+    { name: "contour-on-green", x: 1180, y: 680, width: 280, height: 200 },
+    { name: "colours-busy", x: 880, y: 720, width: 320, height: 240 },
+    { name: "scale-bar", x: WIDTH - 340, y: HEIGHT - 90, width: 320, height: 80 },
+  ];
+  for (const c of crops) {
+    await page.screenshot({
+      path: join(outDir, `${c.name}.png`),
+      clip: c,
+    });
+  }
+  console.log(`Verification crops → ${outDir}`);
 }
 
 async function rasterize(svg) {
@@ -1107,9 +1209,16 @@ async function rasterize(svg) {
       path: join(OUT_DIR, "sample-map.png"),
       type: "png",
     });
+    if (process.env.VERIFY_MAP_SHOTS === "1") {
+      await captureVerificationCrops(page);
+    }
   } finally {
     await browser.close();
   }
+}
+
+function sha256File(path) {
+  return createHash("sha256").update(readFileSync(path)).digest("hex");
 }
 
 async function main() {
@@ -1117,7 +1226,10 @@ async function main() {
   const svgPath = join(OUT_DIR, "sample-map.svg");
   writeFileSync(svgPath, svg, "utf8");
   await rasterize(svg);
+  const pngPath = join(OUT_DIR, "sample-map.png");
+  const hash = sha256File(pngPath);
   console.log(`Wrote ${svgPath} and sample-map.png (${WIDTH}x${HEIGHT})`);
+  console.log(`SHA256 sample-map.png: ${hash}`);
 }
 
 main().catch((err) => {
