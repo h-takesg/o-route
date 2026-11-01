@@ -93,31 +93,31 @@
 <line x1="1680.0" y1="640.0" x2="1690.0" y2="652.0" stroke="#000000" stroke-width="2.7"/>
 </g>
 <g style="mix-blend-mode:multiply">
-<path d="M362.7,599.4 L595.1,338.0" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
-<path d="M644.1,338.7 L805.9,531.3" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
-<path d="M866.9,553.5 L1753.1,396.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
-<path d="M1762.6,415.6 L1527.4,634.4" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
-<path d="M1470.0,682.5 L1370.0,757.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
-<path d="M1304.7,792.7 L655.3,1027.3" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
-<path d="M636.8,1006.5 L723.2,833.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
-<path d="M773.5,816.8 L1853.0,1356.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
-<polygon points="414.5,541.2 396.4,629.3 329.1,569.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linejoin="round"/>
-<circle cx="620" cy="310" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
-<text x="681.5" y="254.5" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="bold" fill="#b04a94">1</text>
-<circle cx="830" cy="560" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
-<text x="744.5" y="643.5" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="bold" fill="#b04a94">2</text>
-<circle cx="1790" cy="390" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
-<text x="1851.5" y="334.5" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="bold" fill="#b04a94">3</text>
-<circle cx="1500" cy="660" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
-<text x="1565.5" y="735.5" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="bold" fill="#b04a94">4</text>
-<circle cx="1340" cy="780" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
-<text x="1405.5" y="855.5" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="bold" fill="#b04a94">5</text>
-<circle cx="620" cy="1040" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
-<text x="534.5" y="1123.5" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="bold" fill="#b04a94">6</text>
-<circle cx="740" cy="800" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
-<text x="650.5" y="756.5" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="bold" fill="#b04a94">7</text>
-<circle cx="1900" cy="1380" r="52.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
-<circle cx="1900" cy="1380" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
+<path d="M348.9,913.5 L604.0,373.9" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
+<path d="M640.8,371.2 L799.2,608.8" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
+<path d="M832.6,675.3 L867.4,772.7" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
+<path d="M916.4,816.8 L1058.6,851.2" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
+<path d="M1079.8,825.7 L961.9,560.0" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
+<path d="M984.0,522.0 L1782.7,443.7" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
+<path d="M1815.8,477.3 L1724.2,1282.7" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
+<path d="M1683.2,1312.9 L311.6,1049.9" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linecap="round"/>
+<polygon points="382.2,843.0 389.6,932.7 308.2,894.3" fill="none" stroke="#b04a94" stroke-width="5.249999999999999" stroke-linejoin="round"/>
+<circle cx="620" cy="340" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
+<text x="681.5" y="284.5" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="bold" fill="#b04a94">1</text>
+<circle cx="820" cy="640" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
+<text x="734.5" y="723.5" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="bold" fill="#b04a94">2</text>
+<circle cx="880" cy="808" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
+<text x="794.5" y="891.5" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="bold" fill="#b04a94">3</text>
+<circle cx="1095" cy="860" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
+<text x="1160.5" y="935.5" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="bold" fill="#b04a94">4</text>
+<circle cx="946.7" cy="525.7" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
+<text x="857.2" y="482.2" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="bold" fill="#b04a94">5</text>
+<circle cx="1820" cy="440" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
+<text x="1881.5" y="384.5" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="bold" fill="#b04a94">6</text>
+<circle cx="1720" cy="1320" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
+<text x="1785.5" y="1395.5" font-family="Arial, Helvetica, sans-serif" font-size="60" font-weight="bold" fill="#b04a94">7</text>
+<circle cx="260" cy="1040" r="52.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
+<circle cx="260" cy="1040" r="37.5" fill="none" stroke="#b04a94" stroke-width="5.249999999999999"/>
 </g>
 <rect x="40" y="1608" width="480" height="56" fill="#ffffff" stroke="#CCCCCC" stroke-width="1"/>
 <text x="54" y="1656" font-family="Arial, Helvetica, sans-serif" font-size="28" fill="#000000">O-Route サンプル地図（架空）</text>

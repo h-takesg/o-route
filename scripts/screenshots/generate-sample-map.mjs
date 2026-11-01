@@ -689,27 +689,7 @@ function buildLegSegments(course, controls, finish, start, triApex, triBl, triBr
   return legSegments;
 }
 
-function validateCourseGeometry(controls, legSegments, controlR, labelPositions) {
-  const clearance = controlR + 15;
-  for (let li = 0; li < legSegments.length; li++) {
-    const leg = legSegments[li];
-    const skip = new Set();
-    if (li === 0) skip.add(0);
-    else if (li === legSegments.length - 1) skip.add(controls.length - 1);
-    else {
-      skip.add(li - 1);
-      skip.add(li);
-    }
-    for (let ci = 0; ci < controls.length; ci++) {
-      if (skip.has(ci)) continue;
-      const d = distSegmentToPoint(leg.p0, leg.p1, controls[ci]);
-      if (d < clearance) {
-        throw new Error(
-          `Course leg ${li + 1} passes within ${clearance}px of control ${ci + 1} (d=${d.toFixed(1)})`,
-        );
-      }
-    }
-  }
+function validateControlLabels(controls, legSegments, controlR, labelPositions) {
   for (const { x, y, num, center } of labelPositions) {
     for (let li = 0; li < legSegments.length; li++) {
       const leg = legSegments[li];
@@ -727,9 +707,487 @@ function pathClearOfLake(waypoints, lakePoly) {
   return waypoints.every((p) => !pointInPolygon(p[0], p[1], lakePoly));
 }
 
+/** Authored map geometry (terrain/water/roads unchanged unless a point feature hosts a control). */
+const MAP_BASIN = { cx: 1150, cy: 1140 };
+const ROAD_PTS = [
+  [140, 920],
+  [360, 890],
+  [580, 860],
+  [820, 835],
+  [1060, 815],
+  [1300, 798],
+  [1540, 785],
+  [1780, 775],
+  [2020, 768],
+  [2280, 762],
+];
+const TRACK_A = [
+  [820, 835],
+  [700, 720],
+  [580, 620],
+  [480, 520],
+];
+const TRACK_B = [
+  [1300, 798],
+  [1420, 720],
+  [1540, 660],
+  [1660, 620],
+];
+const TRACK_C = [
+  [1060, 815],
+  [980, 720],
+  [900, 640],
+];
+const SMALL_PATH_A = [
+  [360, 890],
+  [300, 960],
+  [260, 1040],
+];
+const SMALL_PATH_B = [
+  [1660, 620],
+  [1740, 680],
+  [1800, 760],
+];
+const PATH_TO_BUILDINGS = [
+  [1780, 775],
+  [1840, 820],
+  [1880, 860],
+];
+const BUILDINGS = [
+  [1868, 848, 34, 28],
+  [1920, 868, 28, 24],
+  [848, 808, 32, 26],
+];
+const BOULDERS = [
+  [680, 340],
+  [710, 365],
+  [560, 450],
+  [1750, 560],
+  [1780, 590],
+  [1690, 1280],
+  [1720, 1310],
+  [820, 640],
+];
+const KNOLLS = [
+  [620, 340],
+  [1820, 440],
+  [1720, 1320],
+];
+const VEG_PATCH_FOR_CONTROL = { cx: 900, cy: 470, rx: 82, ry: 52, rot: 0.55, salt: 603 };
+
+/** IOF Foot-O Competition Rules 19.4 @ 1:10000 (100 px = 100 m on ground → 1 px ≈ 1 m). */
+const IOF_MIN_CONTROL_SEP_PX = 30;
+const IOF_SIMILAR_CONTROL_SEP_PX = 60;
+const GUIDELINE_LEG_NEAR_CONTROL_PX = CONTROL_R + 30;
+const GUIDELINE_DOGLEG_MIN_DEG = 35;
+const SYMBOL_EDGE_GAP_PX = 30;
+/** Equilateral triangle: centroid to vertex ≈ side / √3. */
+const START_SYMBOL_OUTER_R = START_TRI_SIDE / Math.sqrt(3);
+const GUIDELINE_LEG_OVERLAP_PX = 25;
+const GUIDELINE_LEG_OVERLAP_MIN_LEN = 80;
+
+function inflowWaypoints(lakePts) {
+  const inflowShore = northLakeShorePoint(lakePts);
+  const wps = [
+    [1160, 140],
+    [1225, 280],
+    [1155, 430],
+    [1105, 580],
+    [1135, 720],
+    [1095, 860],
+    [1100, 960],
+    [1105, 1040],
+  ].filter(([, y]) => y < inflowShore[1] - 60);
+  wps.push([inflowShore[0], inflowShore[1] - 35], [inflowShore[0], inflowShore[1]]);
+  return { inflowShore, inflowBody: wps.slice(0, -1), inflowWps: wps };
+}
+
+function vegPatchCorner(patch, vertexIndex) {
+  const poly = irregularPatch(patch.cx, patch.cy, patch.rx, patch.ry, patch.rot, patch.salt, {
+    a2: 0.12,
+    a3: 0.07,
+    phi2: patch.rot,
+  });
+  return poly[vertexIndex % poly.length].slice();
+}
+
+function lakeShoreWest(lakePts) {
+  let best = null;
+  let bestX = Infinity;
+  for (const p of lakePts) {
+    if (p[1] < 1000) continue;
+    if (p[0] < bestX) {
+      bestX = p[0];
+      best = p;
+    }
+  }
+  return best ?? lakeShorePoint(lakePts, MAP_BASIN.cy + 60, MAP_BASIN.cx - 120);
+}
+
+function buildingCorner(rect, corner) {
+  const [x, y, w, h] = rect;
+  if (corner === "ne") return [x + w, y];
+  if (corner === "nw") return [x, y];
+  if (corner === "se") return [x + w, y + h];
+  return [x, y + h];
+}
+
+function distPx(a, b) {
+  return Math.hypot(a[0] - b[0], a[1] - b[1]);
+}
+
+function angleBetween(ax, ay, bx, by) {
+  const la = Math.hypot(ax, ay);
+  const lb = Math.hypot(bx, by);
+  if (la < 1e-6 || lb < 1e-6) return 180;
+  let c = (ax * bx + ay * by) / (la * lb);
+  c = Math.max(-1, Math.min(1, c));
+  return (Math.acos(c) * 180) / Math.PI;
+}
+
+function distPointToPolyline(p, poly) {
+  let min = Infinity;
+  for (let i = 0; i < poly.length - 1; i++) {
+    min = Math.min(min, distPointToSegment(p, poly[i], poly[i + 1]));
+  }
+  return min;
+}
+
+function legMostlyOnRoad(p0, p1, roadPoly, threshold = 22) {
+  const steps = 12;
+  let on = 0;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const p = [p0[0] + (p1[0] - p0[0]) * t, p0[1] + (p1[1] - p0[1]) * t];
+    if (distPointToPolyline(p, roadPoly) <= threshold) on++;
+  }
+  return on >= steps - 1;
+}
+
+/**
+ * Control positions with ISCD column D/G metadata (ISCD 2018 describes location; it is not a
+ * placement rulebook — IOF Foot-O 19.4 spacing is validated separately).
+ */
+function planSampleCourse(lakePts) {
+  const streamBend = [1095, 860];
+  const vegCorner = vegPatchCorner(VEG_PATCH_FOR_CONTROL, 2).map((v) => fmtCoord(v));
+  const bldg = BUILDINGS[2];
+
+  const start = {
+    code: "S",
+    featureD: "5.4.1 Path junction",
+    locationG: null,
+    featureId: "path-junction-360-890",
+    featureType: "man-made",
+    position: [360, 890],
+  };
+
+  const controls = [
+    {
+      number: 1,
+      code: "31",
+      featureD: "1.11 Knoll",
+      locationG: "top",
+      featureId: "knoll-620-340",
+      featureType: "landform",
+      position: [620, 340],
+    },
+    {
+      number: 2,
+      code: "47",
+      featureD: "2.1 Boulder",
+      locationG: "east side",
+      featureId: "boulder-820-640",
+      featureType: "rock",
+      position: [820, 640],
+    },
+    {
+      number: 3,
+      code: "51",
+      featureD: "5.11 Building",
+      locationG: "north-east corner",
+      featureId: "building-848-808",
+      featureType: "man-made",
+      position: buildingCorner(bldg, "ne"),
+    },
+    {
+      number: 4,
+      code: "63",
+      featureD: "3.2 Stream",
+      locationG: "bend",
+      featureId: "stream-1095-860",
+      featureType: "water",
+      position: streamBend,
+    },
+    {
+      number: 5,
+      code: "78",
+      featureD: "4.2 Vegetation boundary",
+      locationG: "north corner",
+      featureId: "veg-900-470",
+      featureType: "vegetation",
+      position: vegCorner,
+    },
+    {
+      number: 6,
+      code: "84",
+      featureD: "1.11 Knoll",
+      locationG: "top",
+      featureId: "knoll-1820-440",
+      featureType: "landform",
+      position: [1820, 440],
+    },
+    {
+      number: 7,
+      code: "42",
+      featureD: "1.11 Knoll",
+      locationG: "south side",
+      featureId: "knoll-1720-1320",
+      featureType: "landform",
+      position: [1720, 1320],
+    },
+  ];
+
+  const finish = {
+    code: "F",
+    featureD: "5.4 Footpath",
+    locationG: "junction",
+    featureId: "path-end-260-1040",
+    featureType: "man-made",
+    position: [260, 1040],
+  };
+
+  return { start, controls, finish };
+}
+
+function courseSymbolRadii(plan) {
+  return [
+    { label: "Start", position: plan.start.position, outerR: START_SYMBOL_OUTER_R },
+    ...plan.controls.map((c) => ({
+      label: `Control ${c.number}`,
+      position: c.position,
+      outerR: CONTROL_R,
+    })),
+    { label: "Finish", position: plan.finish.position, outerR: FINISH_OUTER_R },
+  ];
+}
+
+/** Minimum gap between overprint symbol outlines (sample map layout). */
+function validateCourseSymbolClearance(plan) {
+  const symbols = courseSymbolRadii(plan);
+  for (let i = 0; i < symbols.length; i++) {
+    for (let j = i + 1; j < symbols.length; j++) {
+      const d = distPx(symbols[i].position, symbols[j].position);
+      const need = symbols[i].outerR + symbols[j].outerR + SYMBOL_EDGE_GAP_PX;
+      if (d < need) {
+        throw new Error(
+          `Course symbols ${symbols[i].label} and ${symbols[j].label}: edge gap ${(d - symbols[i].outerR - symbols[j].outerR).toFixed(1)} px (< ${SYMBOL_EDGE_GAP_PX} px)`,
+        );
+      }
+    }
+  }
+}
+
+function segmentOverlapLengthOnOther(p0, p1, q0, q1, threshold) {
+  const steps = 24;
+  let len = 0;
+  const segLen = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) / steps;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const p = [p0[0] + (p1[0] - p0[0]) * t, p0[1] + (p1[1] - p0[1]) * t];
+    if (distPointToSegment(p, q0, q1) < threshold) len += segLen;
+  }
+  return len;
+}
+
+function similarControlFeatures(a, b) {
+  return a.featureType === b.featureType;
+}
+
+/** IOF Foot Orienteering Competition Rules 19.4 (1:10000: 100 px = 100 m). */
+function validateIofFootOControlSpacing(plan) {
+  const markers = [
+    { label: "Start", ...plan.start },
+    ...plan.controls.map((c) => ({ label: `Control ${c.number}`, ...c })),
+    { label: "Finish", ...plan.finish },
+  ];
+  for (let i = 0; i < markers.length; i++) {
+    for (let j = i + 1; j < markers.length; j++) {
+      const d = distPx(markers[i].position, markers[j].position);
+      const similar = similarControlFeatures(markers[i], markers[j]);
+      const minSep = similar ? IOF_SIMILAR_CONTROL_SEP_PX : IOF_MIN_CONTROL_SEP_PX;
+      if (d < minSep) {
+        const similarNote = similar ? " (similar feature types)" : "";
+        throw new Error(
+          `IOF Foot-O 19.4: ${markers[i].label} and ${markers[j].label} are ${d.toFixed(1)} m apart; minimum ${minSep} m${similarNote}`,
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Course-planning guidelines (not IOF/ISCD rules). Warn only — sample map layout quality.
+ */
+function checkCourseDesignGuidelines(plan, legSegments) {
+  const warnings = [];
+  const controlPts = plan.controls.map((c) => c.position);
+
+  for (let li = 0; li < legSegments.length; li++) {
+    const leg = legSegments[li];
+    const skip = new Set();
+    if (li === 0) skip.add(0);
+    else if (li === legSegments.length - 1) skip.add(plan.controls.length - 1);
+    else {
+      skip.add(li - 1);
+      skip.add(li);
+    }
+    for (let ci = 0; ci < plan.controls.length; ci++) {
+      if (skip.has(ci)) continue;
+      const d = distSegmentToPoint(leg.p0, leg.p1, controlPts[ci]);
+      if (d < GUIDELINE_LEG_NEAR_CONTROL_PX) {
+        warnings.push(
+          `Leg ${li + 1} passes within ${GUIDELINE_LEG_NEAR_CONTROL_PX.toFixed(0)} m of control ${plan.controls[ci].number} (d=${d.toFixed(1)} m)`,
+        );
+      }
+    }
+  }
+
+  const coursePts = [plan.start.position, ...controlPts, plan.finish.position];
+  for (let i = 1; i < coursePts.length - 2; i++) {
+    const prev = coursePts[i - 1];
+    const cur = coursePts[i];
+    const next = coursePts[i + 1];
+    const inx = cur[0] - prev[0];
+    const iny = cur[1] - prev[1];
+    const outx = next[0] - cur[0];
+    const outy = next[1] - cur[1];
+    const turn = angleBetween(-inx, -iny, outx, outy);
+    if (turn < GUIDELINE_DOGLEG_MIN_DEG) {
+      warnings.push(
+        `Possible dog-leg at control ${i} (turn ${turn.toFixed(1)}° < ${GUIDELINE_DOGLEG_MIN_DEG}° guideline)`,
+      );
+    }
+  }
+
+  for (let li = 0; li < legSegments.length; li++) {
+    const { p0, p1 } = legSegments[li];
+    const legLen = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]);
+    if (legLen > 150 && legMostlyOnRoad(p0, p1, ROAD_PTS)) {
+      warnings.push(`Leg ${li + 1} follows the road for most of its length`);
+    }
+  }
+
+  for (let a = 0; a < legSegments.length; a++) {
+    for (let b = a + 2; b < legSegments.length; b++) {
+      if (b === a + 1) continue;
+      const la = legSegments[a];
+      const lb = legSegments[b];
+      const overlap = segmentOverlapLengthOnOther(
+        la.p0,
+        la.p1,
+        lb.p0,
+        lb.p1,
+        GUIDELINE_LEG_OVERLAP_PX,
+      );
+      if (overlap >= GUIDELINE_LEG_OVERLAP_MIN_LEN) {
+        warnings.push(
+          `Legs ${a + 1} and ${b + 1} run within ${GUIDELINE_LEG_OVERLAP_PX} m of each other for ~${overlap.toFixed(0)} m`,
+        );
+      }
+    }
+  }
+
+  return warnings;
+}
+
+function validateCoursePlanning(plan, legSegments, controlR, labelPositions) {
+  validateIofFootOControlSpacing(plan);
+  validateCourseSymbolClearance(plan);
+  validateControlLabels(plan.controls.map((c) => c.position), legSegments, controlR, labelPositions);
+  const guidelines = checkCourseDesignGuidelines(plan, legSegments);
+  for (const msg of guidelines) {
+    console.warn(`Course design guideline: ${msg}`);
+  }
+}
+
+function fmtCoord(n) {
+  return Number(n.toFixed(1));
+}
+
+function fmtPt(p) {
+  return [fmtCoord(p[0]), fmtCoord(p[1])];
+}
+
+function exportSampleCourseJson(plan, lakePts) {
+  const { inflowWps, inflowBody } = inflowWaypoints(lakePts);
+  const outflowShore = lakeShorePoint(lakePts, MAP_BASIN.cy + 130, MAP_BASIN.cx);
+  const outflowWps = [
+    [outflowShore[0], outflowShore[1]],
+    [1135, 1410],
+    [1115, 1550],
+    [1095, 1675],
+  ];
+
+  const payload = {
+    finish: {
+      code: plan.finish.code,
+      featureD: plan.finish.featureD,
+      locationG: plan.finish.locationG,
+      position: fmtPt(plan.finish.position),
+    },
+    geometry: {
+      buildings: BUILDINGS.map(([x, y, w, h]) => ({
+        height: h,
+        width: w,
+        x: fmtCoord(x),
+        y: fmtCoord(y),
+      })),
+      boulders: BOULDERS.map((p) => fmtPt(p)),
+      knolls: KNOLLS.map((p) => fmtPt(p)),
+      lakeOutline: lakePts.map((p) => fmtPt(p)),
+      paths: {
+        pathToBuildings: PATH_TO_BUILDINGS.map((p) => fmtPt(p)),
+        smallPathA: SMALL_PATH_A.map((p) => fmtPt(p)),
+        smallPathB: SMALL_PATH_B.map((p) => fmtPt(p)),
+      },
+      road: ROAD_PTS.map((p) => fmtPt(p)),
+      stream: {
+        inflow: inflowBody.map((p) => fmtPt(p)),
+        inflowToLake: inflowWps.map((p) => fmtPt(p)),
+        outflow: outflowWps.map((p) => fmtPt(p)),
+      },
+      tracks: {
+        trackA: TRACK_A.map((p) => fmtPt(p)),
+        trackB: TRACK_B.map((p) => fmtPt(p)),
+        trackC: TRACK_C.map((p) => fmtPt(p)),
+      },
+    },
+    mapScale: "1:10000",
+    start: {
+      code: plan.start.code,
+      featureD: plan.start.featureD,
+      locationG: plan.start.locationG,
+      position: fmtPt(plan.start.position),
+    },
+    controls: plan.controls.map((c) => ({
+      code: c.code,
+      featureD: c.featureD,
+      locationG: c.locationG,
+      number: c.number,
+      position: fmtPt(c.position),
+    })),
+  };
+  return `${JSON.stringify(payload, null, 2)}\n`;
+}
+
+/** Filled by buildSvg for verification crops and JSON export. */
+let lastCoursePlan = null;
+let lastLakePts = null;
+
 function buildSvg() {
-  const basinCx = 1150;
-  const basinCy = 1140;
+  const basinCx = MAP_BASIN.cx;
+  const basinCy = MAP_BASIN.cy;
   const hGrid = smoothGrid(
     sampleGrid(authoredHeight, HEIGHT_GRID_W, HEIGHT_GRID_H),
     HEIGHT_GRID_W,
@@ -737,6 +1195,9 @@ function buildSvg() {
     3,
   );
   const { lakePts } = lakeFromBasin(hGrid, HEIGHT_GRID_W, HEIGHT_GRID_H, basinCx, basinCy);
+  lastLakePts = lakePts;
+  const coursePlan = planSampleCourse(lakePts);
+  lastCoursePlan = coursePlan;
 
   let hMin = Infinity;
   let hMax = -Infinity;
@@ -880,19 +1341,7 @@ function buildSvg() {
     `<polygon points="${polygonPoints(lakePts)}" fill="none" stroke="${ISOM.BLUE}" stroke-width="${STROKE.stream}"/>`,
   );
 
-  const inflowShore = northLakeShorePoint(lakePts);
-  const inflowWps = [
-    [1160, 140],
-    [1225, 280],
-    [1155, 430],
-    [1105, 580],
-    [1135, 720],
-    [1095, 860],
-    [1100, 960],
-    [1105, 1040],
-  ].filter(([, y]) => y < inflowShore[1] - 60);
-  inflowWps.push([inflowShore[0], inflowShore[1] - 35], [inflowShore[0], inflowShore[1]]);
-  const inflowBody = inflowWps.slice(0, -1);
+  const { inflowShore, inflowBody, inflowWps } = inflowWaypoints(lakePts);
   const inflowD = `${catmullRomPath(inflowBody)} L${inflowShore[0].toFixed(1)},${inflowShore[1].toFixed(1)}`;
   parts.push(
     `<path d="${inflowD}" fill="none" stroke="${ISOM.BLUE}" stroke-width="${STROKE.stream}" stroke-linecap="round"/>`,
@@ -921,18 +1370,7 @@ function buildSvg() {
     );
   }
 
-  const roadPts = [
-    [140, 920],
-    [360, 890],
-    [580, 860],
-    [820, 835],
-    [1060, 815],
-    [1300, 798],
-    [1540, 785],
-    [1780, 775],
-    [2020, 768],
-    [2280, 762],
-  ];
+  const roadPts = ROAD_PTS;
   const roadD = catmullRomPath(roadPts);
   const roadHalf = ROAD_FILL_W / 2;
   parts.push(
@@ -945,23 +1383,9 @@ function buildSvg() {
     `<path d="${catmullRomPath(offsetPolyline(roadPts, -roadHalf))}" fill="none" stroke="${ISOM.BLACK}" stroke-width="${STROKE.roadOutline}" stroke-linecap="round"/>`,
   );
 
-  const trackA = [
-    [820, 835],
-    [700, 720],
-    [580, 620],
-    [480, 520],
-  ];
-  const trackB = [
-    [1300, 798],
-    [1420, 720],
-    [1540, 660],
-    [1660, 620],
-  ];
-  const trackC = [
-    [1060, 815],
-    [980, 720],
-    [900, 640],
-  ];
+  const trackA = TRACK_A;
+  const trackB = TRACK_B;
+  const trackC = TRACK_C;
   for (const t of [trackA, trackB, trackC]) {
     if (pathClearOfLake(t, lakePts)) {
       parts.push(
@@ -984,16 +1408,8 @@ function buildSvg() {
     `<path d="${catmullRomPath(lakeShorePath)}" fill="none" stroke="${ISOM.BLACK}" stroke-width="${STROKE.path}" stroke-dasharray="${(STROKE.path * 4).toFixed(1)} ${(STROKE.path * 3.6).toFixed(1)}" stroke-linecap="round"/>`,
   );
 
-  const smallPathA = [
-    [360, 890],
-    [300, 960],
-    [260, 1040],
-  ];
-  const smallPathB = [
-    [1660, 620],
-    [1740, 680],
-    [1800, 760],
-  ];
+  const smallPathA = SMALL_PATH_A;
+  const smallPathB = SMALL_PATH_B;
   for (const p of [smallPathA, smallPathB]) {
     if (pathClearOfLake(p, lakePts)) {
       parts.push(
@@ -1002,45 +1418,24 @@ function buildSvg() {
     }
   }
 
-  const pathToBuildings = [
-    [1780, 775],
-    [1840, 820],
-    [1880, 860],
-  ];
+  const pathToBuildings = PATH_TO_BUILDINGS;
   if (pathClearOfLake(pathToBuildings, lakePts)) {
     parts.push(
       `<path d="${catmullRomPath(pathToBuildings)}" fill="none" stroke="${ISOM.BLACK}" stroke-width="${STROKE.path}" stroke-linecap="round"/>`,
     );
   }
 
-  const buildings = [
-    [1868, 848, 34, 28],
-    [1920, 868, 28, 24],
-    [848, 808, 32, 26],
-  ];
+  const buildings = BUILDINGS;
   for (const [bx, by, bw, bh] of buildings) {
     parts.push(`<rect x="${bx}" y="${by}" width="${bw}" height="${bh}" fill="${ISOM.BLACK}"/>`);
   }
 
-  const boulders = [
-    [680, 340],
-    [710, 365],
-    [560, 450],
-    [1750, 560],
-    [1780, 590],
-    [1690, 1280],
-    [1720, 1310],
-    [820, 640],
-  ];
+  const boulders = BOULDERS;
   for (const [bx, by] of boulders) {
     parts.push(`<circle cx="${bx}" cy="${by}" r="${STROKE.path}" fill="${ISOM.BLACK}"/>`);
   }
 
-  const knolls = [
-    [620, 340],
-    [1820, 440],
-    [1720, 1320],
-  ];
+  const knolls = KNOLLS;
   for (const [kx, ky] of knolls) {
     parts.push(`<circle cx="${kx}" cy="${ky}" r="${STROKE.contourIndex}" fill="${ISOM.BROWN}"/>`);
   }
@@ -1086,17 +1481,9 @@ function buildSvg() {
   const overprint = ISOM.PURPLE;
   const legStroke = STROKE.overprint;
 
-  const start = [380, 580];
-  const controls = [
-    [620, 310],
-    [830, 560],
-    [1790, 390],
-    [1500, 660],
-    [1340, 780],
-    [620, 1040],
-    [740, 800],
-  ];
-  const finish = [1900, 1380];
+  const start = coursePlan.start.position;
+  const controls = coursePlan.controls.map((c) => c.position);
+  const finish = coursePlan.finish.position;
   const course = [start, ...controls, finish];
 
   const { apex: triApex, bl: triBl, br: triBr } = startTriangleToward(start, controls[0], START_TRI_SIDE);
@@ -1122,7 +1509,7 @@ function buildSvg() {
     const [tx, ty] = controlLabelPos(c, legSegments.map((l) => [l.p0, l.p1]), controlR);
     return { x: tx, y: ty, num, center: c };
   });
-  validateCourseGeometry(controls, legSegments, controlR, labelPositions);
+  validateCoursePlanning(coursePlan, legSegments, controlR, labelPositions);
 
   parts.push(`<g ${MULTIPLY}>`);
   for (const leg of legSegments) {
@@ -1181,12 +1568,25 @@ async function captureVerificationCrops(page) {
   const outDir = join(OUT_DIR, "..", "..", "test-results", "map-verify");
   mkdirSync(outDir, { recursive: true });
   const crops = [
-    { name: "start-triangle", x: 280, y: 480, width: 220, height: 220 },
-    { name: "control-purple-blend", x: 560, y: 240, width: 200, height: 200 },
-    { name: "contour-on-green", x: 1180, y: 680, width: 280, height: 200 },
+    { name: "start-triangle", x: 260, y: 790, width: 220, height: 220 },
+    { name: "control-1-knoll", x: 520, y: 240, width: 200, height: 200 },
+    { name: "control-4-building", x: 780, y: 708, width: 200, height: 200 },
+    { name: "control-6-lake", x: 1120, y: 832, width: 220, height: 220 },
     { name: "colours-busy", x: 880, y: 720, width: 320, height: 240 },
     { name: "scale-bar", x: WIDTH - 340, y: HEIGHT - 90, width: 320, height: 80 },
   ];
+  if (lastCoursePlan) {
+    for (const c of lastCoursePlan.controls.slice(0, 3)) {
+      const [cx, cy] = c.position;
+      crops.push({
+        name: `control-${c.number}-${c.featureType}`,
+        x: Math.max(0, Math.round(cx - 100)),
+        y: Math.max(0, Math.round(cy - 100)),
+        width: 200,
+        height: 200,
+      });
+    }
+  }
   for (const c of crops) {
     await page.screenshot({
       path: join(outDir, `${c.name}.png`),
@@ -1225,6 +1625,18 @@ async function main() {
   const svg = buildSvg();
   const svgPath = join(OUT_DIR, "sample-map.svg");
   writeFileSync(svgPath, svg, "utf8");
+  if (lastCoursePlan && lastLakePts) {
+    const jsonPath = join(OUT_DIR, "sample-course.json");
+    writeFileSync(jsonPath, exportSampleCourseJson(lastCoursePlan, lastLakePts), "utf8");
+    console.log(`Wrote ${jsonPath}`);
+    console.log("ISCD control descriptions:");
+    console.log(`  Start: ${lastCoursePlan.start.featureD} @ ${lastCoursePlan.start.position.join(",")}`);
+    for (const c of lastCoursePlan.controls) {
+      const loc = c.locationG ? ` (${c.locationG})` : "";
+      console.log(`  ${c.number}: ${c.featureD}${loc} [${c.code}] @ ${c.position.join(",")}`);
+    }
+    console.log(`  Finish: ${lastCoursePlan.finish.featureD} @ ${lastCoursePlan.finish.position.join(",")}`);
+  }
   await rasterize(svg);
   const pngPath = join(OUT_DIR, "sample-map.png");
   const hash = sha256File(pngPath);
