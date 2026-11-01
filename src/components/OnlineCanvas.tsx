@@ -13,18 +13,21 @@ import { useViewSharing } from "../hooks/useViewSharing";
 
 type Props = {
   roomId: string;
+  roomKey: CryptoKey;
 };
 
-function OnlineCanvas({ roomId }: Props) {
+function OnlineCanvas({ roomId, roomKey }: Props) {
   const [width, height] = useWindowSize();
   const [mode, setMode] = useState<Mode>("move");
   const [viewMode, setViewMode] = useState<ViewMode>("single");
   const [viewModel, setViewModel] = useState(new ViewModel());
   const [lineOpacity, setLineOpacity] = useState<LineOpacity>("opaque");
 
-  const { imageUrl, setImage, uploadError, clearUploadError } = useOnlineRoomImage(roomId);
-  const { lines, addPointToDrawingLine, endDrawing, removeLines, clearAllLines } =
-    useOnlineLines(roomId);
+  const { imageUrl, setImage, uploadError, clearUploadError } = useOnlineRoomImage(roomId, roomKey);
+  const { lines, addPointToDrawingLine, endDrawing, removeLines, clearAllLines } = useOnlineLines(
+    roomId,
+    roomKey,
+  );
 
   useEffect(() => {
     if (uploadError === null) return;
@@ -32,7 +35,7 @@ function OnlineCanvas({ roomId }: Props) {
     clearUploadError();
   }, [uploadError, clearUploadError]);
 
-  useViewSharing(roomId, viewMode, setViewMode, viewModel, setViewModel, width, height);
+  useViewSharing(roomId, roomKey, viewMode, setViewMode, viewModel, setViewModel, width, height);
 
   return (
     <>

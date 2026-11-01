@@ -1,40 +1,62 @@
 ---
 description: Firebase sync and OnlineCanvas cautions
-globs: src/components/OnlineCanvas.tsx,src/firebase.ts,database.rules.json,storage.rules
+globs: src/components/OnlineCanvas.tsx,src/firebase.ts,database.rules.json,storage.rules,src/crypto/roomCrypto.ts,src/hooks/useOnlineLines.ts,src/hooks/useOnlineRoomImage.ts,src/hooks/useViewSharing.ts
 alwaysApply: false
 ---
 
 # Firebase / Online Sync
 
+Online rooms are **E2EE-only** (AES-GCM 256). Room key is generated in `Home.tsx`, carried only in URL fragment `#k=<base64url>` (never written to Firebase).
+
 ## Data paths
 
 ```
-rooms/{roomId}/timestamp | image | lines/{id}/points,isDrawing,timestamp | view/
+rooms/{roomId}/timestamp                    # plaintext (TTL)
+rooms/{roomId}/e2ee = { v: 1, check }       # envelope; purpose "check"
+rooms/{roomId}/image                        # "" | envelope(JSON {path,type}); purpose "image-meta"
+rooms/{roomId}/lines/{lineId}/
+  isDrawing, timestamp                      # plaintext metadata
+  chunks/{n}                                # envelope(Float64 LE [x,y]); purpose "line/{lineId}/{n}"
+rooms/{roomId}/view/
+  id                                        # plaintext leader UUID
+  payload                                   # envelope(JSON {center,area,rotation}); purpose "view/{id}"
 ```
+
+Storage: `{roomId}/{timestamp}` ciphertext (`application/octet-stream`). RTDB `image` holds encrypted meta, not a public URL.
+
+Envelope (RTDB): `1.<iv b64url>.<ct b64url>`. Binary (Storage): `iv(12) || ciphertext+tag` (`ENCRYPTION_OVERHEAD_BYTES` = 28). AAD: `o-route/v1/{roomId}/{purpose}`.
 
 ## Patterns
 
 - DB refs via `useDatabaseRef` (created once per mount)
-- Drawing: local `setLines` + remote `set`/`update` on `points` indices
-- Image: Storage `uploadBytes` → `getDownloadURL` → RTDB `image`
+- Crypto: `src/crypto/roomCrypto.ts` — encrypt/decrypt, key import from hash, `createRoomKeyCheck`
+- Drawing send (`useOnlineLines`): per-line `enqueueLineWrite` queue; chunk index assigned synchronously; initial `set` awaited, then chunk `update`s without awaiting; `isDrawing: false` queued after last chunk; each step re-checks `suppressedLineKeysRef`
+- Drawing receive: `ChunkAssembler` per line — contiguous indices only; dedupe re-fired `onChildAdded`; `Lines.appendValues` no-ops for removed lines; effect-local `cancelled` for async decrypt (StrictMode); effect deps `[linesRef]` only
+- Image (`useOnlineRoomImage`): verify `e2ee/check` after room `get`; decrypt meta; `getBytes` only under `${roomId}/`; blob object URL (revoke on replace/unmount)
+- View (`useViewSharing`): leader claim writes `{ id }` before id listener; ticks `update` **payload only** (never `id`); leader republishes foreign payload; follower applies latest snapshot only
 
 ## Hotspot
 
 Sync logic lives in `hooks/useOnlineLines.ts`, `hooks/useOnlineRoomImage.ts`, and `hooks/useViewSharing.ts`. `OnlineCanvas.tsx` wires them together.
 
+## E2EE rules
+
+- Never write plaintext coordinates, view JSON, or image bytes to RTDB/Storage
+- Never send the room key to Firebase (fragment only)
+- Keep AAD purposes aligned with `roomCrypto.ts` (`check`, `image-meta`, `line/...`, `view/...`)
+- Keep `useViewSharing` leader ticks payload-only (`update` on `payload`, not `id`)
+
 ## Known issues (verify before fixing)
 
-- Line 161: `Object.keys(lines)` is wrong for Immutable `Lines`; stale closure in `useEffect([])`
 - View mode typo `"follwer"` is intentional until migration plan exists
+- **Production**: Storage bucket CORS must allow browser `getBytes` (see repo `storage.cors.json` + `gsutil cors set` / `gcloud storage buckets update`). Emulator needs no CORS.
 
 ## Security
 
-No auth. Do not widen `database.rules.json` or `storage.rules`.
+No auth. Do not widen `database.rules.json` or `storage.rules`. Leaked metadata: line count, chunk count (= points), timing, image size, `isDrawing`, timestamps, leader `id`, `roomId`. Server can delete/replay but not read or forge ciphertext without the key.
 
 ## Local development
 
 Use `npm run dev:emulator` or set `VITE_USE_FIREBASE_EMULATOR=true` with `npm run emulators`.
 
-## Local development
-
-Use `npm run dev:emulator` or set `VITE_USE_FIREBASE_EMULATOR=true` with `npm run emulators`.
+Run npm/test commands inside the Dev Container. `npm install` on the Windows host replaces Linux native bindings and breaks Vite in the container — run `npm install` inside the container instead.

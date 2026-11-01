@@ -13,7 +13,7 @@
 | 執筆者 | Cursor Agent（Composer） |
 | モデル | Composer（Cursor が提供する言語モデル） |
 | 調査方法 | リポジトリ全ファイルの静的読解、`npm run verify`（format + unit + e2e + build）の実行確認 |
-| 実行確認 | `npm run build` 成功（5 ページ prerender）、`test:unit` 35 件、`test:e2e` 11 件、`eslint src` エラーなし |
+| 実行確認 | `npm run build` 成功（6 ページ prerender）、`test:unit` 67 件、`test:e2e` 32 件、`eslint src` エラーなし（2026-11-01 時点） |
 | 信頼度 | コード構造・依存関係・設計意図・ビルド・E2E（Emulator 経由）は**高**。本番 Firebase 実環境での運用検証は**未実施** |
 
 > 後から信頼度を確認する際は、上記「調査日」「調査方法」と現行コードの差分を照合してください。
@@ -27,15 +27,15 @@
 - 地図画像の読み込み、拡大・縮小、回転（1 度刻み）
 - 自由描画、消しゴム（線単位）、全消し
 - 線の透明度切替（ビューワー単位で全線を transparent / translucent / opaque）
-- オンラインモードで URL 共有による共同作業、視点共有
+- オンラインモードで URL 共有による共同作業、視点共有（**E2EE**: AES-GCM 256、鍵は URL フラグメント `#k=` のみ）
 
 | 項目 | 値 |
 |------|-----|
 | 本番 URL | https://o-route.web.app |
 | GitHub | https://github.com/h-takesg/o-route |
 | 作者（アプリ） | [@tooktwi](https://twitter.com/tooktwi) |
-| 総行数 | 約 2,000 行（`src/` 内 TypeScript/TSX） |
-| ファイル数 | 34 ファイル（`src/` 内 TS/TSX）+ `e2e/` テスト |
+| 総行数 | 約 2,500 行（`src/` 内 TypeScript/TSX） |
+| ファイル数 | 50 ファイル（`src/` 内 TS/TSX）+ `e2e/` テスト |
 
 ---
 
@@ -45,8 +45,9 @@
 |---------|------|------|
 | UI | React 18, TypeScript 5.1, MUI 5, react-icons | 関数コンポーネントのみ |
 | キャンバス | Konva 9, react-konva 18, use-image | `/local` `/online` は dynamic import でクライアント専用。`ssr.external: ["konva", "react-konva"]` |
-| ルーティング / SSR | Vike 0.4（`prerender: true`, `clientRouting: true`） | v1 design（`+config.h.ts`） |
+| ルーティング / SSR | Vike ^0.4.268（`prerender: true`, `clientRouting: true`） | v1 design（`+config.h.ts`）。0.4.260 は Vite `--host`/`--port` を拒否し dev/e2e サーバーが壊れる |
 | ビルド | Vite 8 | `ssr.noExternal: ["react-icons"]` |
+| 暗号 | Web Crypto (`crypto.subtle`) | `src/crypto/roomCrypto.ts`。secure context（https / localhost）必須 |
 | 状態モデル | Immutable.js 4（`Record`, `Map`, `List`） | 直接 mutate 禁止 |
 | BaaS | Firebase 11（RTDB, Storage, Hosting） | 認証なし。ローカルは Emulator 対応 |
 | 品質 | ESLint 8 + Prettier 3 + Vitest 4 + Playwright 1.49 + typescript-eslint 7 | `npm run verify` で一括検証 |
@@ -62,18 +63,21 @@
 │   ├── pages/              # Vike ファイルベースルーティング
 │   │   ├── index/          # ホーム（モード選択）
 │   │   ├── local/          # ローカルモード
-│   │   ├── online/         # オンラインモード
+│   │   ├── online/         # オンラインモード（roomId + `#k=` 鍵）
 │   │   ├── errors/room_not_found/
+│   │   ├── errors/invalid_room_key/
 │   │   └── _error/         # 404/500
-│   ├── components/         # UI・キャンバス（10 ファイル）
-│   ├── models/             # ViewModel, DrawLine, Lines
+│   ├── components/         # UI・キャンバス
+│   ├── crypto/             # roomCrypto（E2EE）
+│   ├── models/             # ViewModel, DrawLine, Lines, ChunkAssembler
 │   ├── hooks/              # useDatabaseRef, useWindowSize, useOnlineLines 等
 │   ├── renderer/           # SSR / クライアントハイドレーション
 │   ├── documents/          # home_ja.md（ホーム画面 Markdown）
 │   ├── firebase.ts         # Firebase 初期化（Emulator 接続含む）
 │   ├── math.ts             # Vector, 線分交差判定
 │   └── types.ts            # Mode, ViewMode, LineOpacity
-├── e2e/                    # Playwright E2E（home / local / online）
+├── e2e/                    # Playwright E2E（home, local, online, sync, room-key, image/view E2EE）
+├── storage.cors.json       # 本番 Storage CORS（`getBytes` 用・手動適用）
 ├── playwright.config.ts    # E2E 設定（dev サーバー再利用 or e2e:server）
 ├── vitest.config.ts
 ├── tsconfig.e2e.json       # e2e / playwright 用（composite: true, noEmit: false）
@@ -99,21 +103,25 @@
 | `Canvas.tsx` | 130 | Konva Stage、線の透明度適用（描画 JSX） | Local/Online 共通。`data-testid="canvas-stage"`。線は `Group` で束ね、半透明時は `cache()` して均一な透明度に |
 | `hooks/useCanvasGestures.ts` | 250 | パン/ズーム/回転、描画/消去イベント、慣性スクロール | `Canvas.tsx` から抽出。アンマウント時に momentum を停止 |
 | `OnlineCanvas.tsx` | 65 | オンライン画面の薄いラッパー。フックを束ねて Canvas に渡す | 同期ロジックは hooks 側。アップロードエラーは UI 層で表示 |
-| `hooks/useOnlineLines.ts` | 155 | Firebase 線の送受信・増分同期 | `ownLineKeysRef` で自分の線を判定。unsubscribe 方式でリスナー管理 |
-| `hooks/useOnlineRoomImage.ts` | 50 | 画像 URL 同期・Storage アップロード | `get()` 失敗時 room_not_found へ。`uploadError` を返す |
-| `hooks/useViewSharing.ts` | 125 | 視点共有（leader/follwer）、30fps 書き込み | `VIEW_SYNC_FPS = 30`。effect cleanup でリスナー/タイマー解除 |
+| `hooks/useOnlineLines.ts` | 285 | Firebase 線の E2EE 送受信・chunk 同期 | `enqueueLineWrite` キュー・`ChunkAssembler`・effect deps `[linesRef]` を安易に変えない |
+| `hooks/useOnlineRoomImage.ts` | 180 | 暗号化画像 meta / Storage 取得 | `e2ee/check` 検証。`getBytes` + decrypt → blob URL。20MB − 28 バイト上限 |
+| `hooks/useViewSharing.ts` | 250 | 視点共有（leader/follwer）、30fps | リーダー tick は `payload` のみ `update`。claim は `{ id }` を先に `set` |
+| `crypto/roomCrypto.ts` | 325 | AES-GCM 256、envelope、AAD、鍵 import/export | 平文座標・view・画像を Firebase に書かない |
+| `models/ChunkAssembler.ts` | 35 | 受信 chunk の連番組み立て | 非連続 index は保留。重複 `onChildAdded` を無視 |
 | `LocalCanvas.tsx` | 80 | ローカル state のみ。`URL.createObjectURL` で画像 | OnlineCanvas の簡易版 |
 | `ViewModel.ts` | 47 | 位置・スケール・回転の Immutable Record | ユニットテストあり |
 | `LineModel.ts` | 112 | DrawLine / Lines。消しゴムの交差判定 | ユニットテストあり |
 | `math.ts` | 89 | Vector クラス、線分交差、clamp | ユニットテストあり |
-| `Home.tsx` | 113 | モード選択、ルーム作成（`push` + `navigate`） | `data-testid="enter-local"` / `enter-online` |
+| `Home.tsx` | 160 | モード選択、E2EE ルーム作成（鍵生成 + `#k=` 遷移） | `crypto.subtle` 無し（LAN http 等）で alert。`data-testid="enter-local"` / `enter-online` |
 | `BasicControl.tsx` | 146 | ツールバー（移動/ペン/消しゴム/全消し/画像） | `data-testid="mode-*"`, `clear-all`, `load-image` |
-| `ViewSharingControl.tsx` | 49 | 視点共有モード切替（オンラインのみ） | `"follwer"` typo に注意 |
+| `ViewSharingControl.tsx` | 55 | 視点共有モード切替（オンラインのみ） | `"follwer"` typo に注意。`view-single` / `view-leader` / `view-follwer` |
 | `LineOpacityControl.tsx` | 55 | 線の透明度切替（Local/Online 両方） | 値は `transparent`/`translucent`/`opaque` の semantic 3 段階。id/UI に数値は含めない |
 | `hooks/useDatabaseRef.ts` | 13 | Firebase ref を useState で 1 回生成 | path は roomId 依存で不変想定 |
 | `hooks/useWindowSize.ts` | 18 | window resize リスナー | |
 | `pages/local/+Page.tsx` | 19 | `LocalCanvas` を dynamic import | SSR では `null` |
-| `pages/online/+Page.tsx` | 25 | `roomId` 取得後 `OnlineCanvas` を dynamic import | `roomId` なしは Vike `navigate` で `room_not_found` へ |
+| `pages/online/+Page.tsx` | 47 | `roomId` + hash `#k=` から鍵 import、`OnlineCanvas` | 鍵欠落・不正 → `invalid_room_key`。`roomId` なし → `room_not_found` |
+| `components/InvalidRoomKey.tsx` | 20 | 無効鍵エラー UI | `data-testid="invalid-room-key"` |
+| `components/RoomNotFound.tsx` | 20 | ルーム不在・期限切れ | |
 
 ---
 
@@ -123,8 +131,9 @@
 |------|---------------|------|
 | `/` | `Home` | ローカル / オンライン選択 |
 | `/local` | `LocalCanvas` | 端末内のみ。タブ閉じで消える |
-| `/online?roomId=xxx` | `OnlineCanvas` | Firebase ルーム。24 時間有効 |
-| `/errors/room_not_found` | `RoomNotFound` | 無効 roomId |
+| `/online?roomId=xxx#k=…` | `OnlineCanvas` | E2EE Firebase ルーム。24 時間有効。鍵は fragment のみ |
+| `/errors/room_not_found` | `RoomNotFound` | 無効 roomId・期限切れ |
+| `/errors/invalid_room_key` | `InvalidRoomKey` | 鍵欠落・形式不正・check 不一致 |
 | `/_error` | 404/500 | Vike エラーページ |
 
 Vike 設定（`src/renderer/+config.h.ts`）:
@@ -142,8 +151,9 @@ Home (/)
   │
   └─→ OnlineCanvas (/online) ─→ Canvas (Konva)
           ├─ useOnlineLines / useOnlineRoomImage / useViewSharing
-          ├─ Firebase RTDB (lines, view, image URL)
-          └─ Firebase Storage (画像バイナリ)
+          ├─ roomKey from URL hash `#k=` (never Firebase)
+          ├─ Firebase RTDB (encrypted lines, view payload, image meta, e2ee check)
+          └─ Firebase Storage (暗号化画像バイナリ)
 ```
 
 ### コンポーネント階層
@@ -161,25 +171,33 @@ PageShell (StrictMode)
        │         ├─ BasicControl       … data-testid="mode-*"
        │         ├─ LineOpacityControl … data-testid="opacity-*"
        │         └─ ViewSharingControl (Online のみ)
-       └─ RoomNotFound
+       └─ RoomNotFound / InvalidRoomKey
 ```
 
 ### データモデル（Firebase Realtime Database）
 
+オンラインルームは**暗号化のみ**（平文座標・平文 view・公開 Storage URL は廃止）。
+
 ```
 rooms/{roomId}/
-  ├── timestamp      # ルーム作成時刻（24h TTL の基準）
-  ├── image          # Storage 画像 URL（文字列）
+  ├── timestamp      # ルーム作成時刻（24h TTL の基準・平文）
+  ├── e2ee           # { v: 1, check: envelope("o-route-e2ee-v1", purpose "check") }
+  ├── image          # "" | envelope(JSON { path, type }, purpose "image-meta")
   ├── lines/{lineId}/
-  │     ├── points   # [x0, y0, x1, y1, ...] または {index: value} で増分更新
-  │     ├── isDrawing
-  │     └── timestamp
-  └── view/          # 視点共有
-        ├── id       # リーダー UUID（競合解決用）
-        ├── center   # {x, y}
-        ├── area     # {width, height}
-        └── rotation
+  │     ├── isDrawing, timestamp   # 平文メタデータ
+  │     └── chunks/{n}             # envelope(Float64 LE [x,y], purpose "line/{lineId}/{n}")
+  └── view/
+        ├── id       # リーダー UUID（平文・競合解決）
+        └── payload  # envelope(JSON { center, area, rotation }, purpose "view/{id}")
 ```
+
+**Storage**: `{roomId}/{Date.now()}` に `iv(12)||ciphertext+tag`（`contentType: application/octet-stream`、最大 20MB）。RTDB の `image` は暗号化メタのみ。
+
+**Envelope（RTDB 文字列）**: `1.<iv base64url>.<ct base64url>`。**AAD**: `o-route/v1/{roomId}/{purpose}`。**オーバーヘッド**: 28 バイト（`ENCRYPTION_OVERHEAD_BYTES`）。
+
+**漏れるメタデータ**（暗号化されない）: 線の本数、chunk 数（≒ 点数）、書き込みタイミング、画像サイズ、`isDrawing`、タイムスタンプ、リーダー `id`、`roomId`。サーバーは削除・リプレイ可能だが、鍵なしでは復号・改ざん不可。
+
+**鍵**: ルーム作成時に `Home.tsx` で生成。共有は URL 全体（`#k=` 含む）。HTTP リクエストや Referer に fragment は載らない。
 
 ### 描画・操作（Canvas 定数）
 
@@ -208,8 +226,8 @@ rooms/{roomId}/
 | モード | 動作 |
 |--------|------|
 | `single` | 各自独立。view リスナー解除 |
-| `leader` | 30fps で `rooms/{roomId}/view` に書き込み。`id` でリーダー競合を解決 |
-| `follwer` | リーダーの view を受信して追従（**typo**: follower の意） |
+| `leader` | 30fps で `view/payload` のみ `update`（`id` は claim 時に一度 `set`） |
+| `follwer` | 最新 snapshot の `payload` を復号して追従（**typo**: follower の意）。欠落・復号失敗は無視 |
 
 リーダーが複数いる場合、後から leader になった人の `id` が優先され、先着は follower に降格する。
 
@@ -237,9 +255,9 @@ rooms/{roomId}/
 ### Firebase
 
 - DB ref は `useDatabaseRef` で生成（マウント時 1 回）
-- ルーム作成: `push(roomsRef, { image: "", lines: {}, timestamp: serverTimestamp() })`
-- 描画中の線: `points` を index キーで `update` して増分同期
-- 画像: Storage に `uploadBytes` → `getDownloadURL` → RTDB `image` に URL 保存
+- ルーム作成: `push` + `set` with `{ image: "", lines: {}, timestamp, e2ee: { v: 1, check } }` + navigate with `#k=`
+- 描画中の線: `chunks/{n}` に envelope で座標ペアを `update`（`points` フィールドは廃止）
+- 画像: Storage に暗号化バイナリ `uploadBytes` → RTDB `image` に暗号化メタ JSON envelope
 
 ### Vike / SSR
 
@@ -271,17 +289,27 @@ pointerDown/move (mode=draw)
 pointerMove (mode=draw)
   → OnlineCanvas.addPointToDrawingLine
   ├─ local: setLines (即時反映)
-  └─ remote: set / update Firebase lines/{id}/points
+  └─ remote: enqueueLineWrite → set line + update chunks/{n} (encrypted)
+       初期 set を await 後、chunk update は順序付きで非 await
+       isDrawing:false は同一キューで最後に発行
 ```
 
 ### オンライン描画（受信側）
 
 ```
-onChildAdded(linesRef)
-  → DrawLine.of(snapshot) で Lines に追加
-  → 描画中なら onChildAdded(points) + onValue(isDrawing) で増分監視
-onChildRemoved(linesRef)
-  → Lines.removeLine
+onChildAdded(lines/{id})
+  → isDrawing / timestamp 監視 + onChildAdded(chunks/{n})
+  → decrypt → ChunkAssembler.offer → Lines.appendValues
+onChildRemoved(lines/{id})
+  → Lines.removeLine（appendValues は削除済み線を no-op）
+```
+
+### オンライン画像
+
+```
+upload: encryptBinary → Storage (octet-stream) → encryptJson meta → RTDB image
+download: get image meta → decrypt → getBytes(roomId/...) → decryptBinary → blob: URL
+  （同一オリジンの blob のため CORS 汚染なし。本番 Storage は CORS 設定が必要）
 ```
 
 ### 消しゴム
@@ -302,16 +330,16 @@ npm run dev      # vite --host（WSL/Dev Container 向けに usePolling 有効�
 npm run build    # tsc && vite build（prerender 含む）
 npm run preview  # vite preview --host
 npm run format   # eslint src --fix && prettier --write src
-npm run test:unit   # Vitest（math / ViewModel / LineModel）
+npm run test:unit   # Vitest（math, ViewModel, LineModel, roomCrypto, ChunkAssembler）
 npm run test:e2e    # Playwright（UI + 操作 + Emulator 連携）
 npm run verify      # format + unit + e2e + build（エージェント向け一括検証）
 ```
 
-| コマンド | 確認結果（2026-07-05） |
+| コマンド | 確認結果（2026-11-01） |
 |---------|----------------------|
-| `npm run build` | 成功。5 HTML ページ prerender |
-| `npm run test:unit` | 35 テスト通過 |
-| `npm run test:e2e` | Playwright + Firebase Emulator（要 Java 21・Chromium） |
+| `npm run build` | 成功。6 HTML ページ prerender |
+| `npm run test:unit` | 67 テスト通過（5 ファイル） |
+| `npm run test:e2e` | 32 テスト（Playwright + Emulator。要 Java 21・Chromium） |
 | `eslint src` | エラーなし |
 
 デプロイ先: Firebase Hosting（`dist/client`）。`firebase.json` で Cache-Control: no-cache。
@@ -320,11 +348,24 @@ npm run verify      # format + unit + e2e + build（エージェント向け一�
 
 ## セキュリティ・運用
 
-- **認証なし**。roomId を知る人が読み書き可能
+- **認証なし**。roomId を知る人が RTDB/Storage に読み書き可能（中身は E2EE のため平文は読めない）
+- **E2EE**: AES-GCM 256。ルーム鍵は URL fragment `#k=` のみ（Firebase 非送信）。鍵共有 = URL 共有
+- **secure context**: `crypto.subtle` が必要（https または localhost）。LAN の http ではオンラインルーム作成不可（alert）
 - DB ルール: `rooms` への write は誰でも可。各 room は `timestamp + 24h` まで read/write
-- Storage: read 全公開。write は 20MB 未満かつ `image/*` のみ
+- Storage: read 全公開。write は 20MB 未満かつ `contentType == application/octet-stream` のみ
+- **本番 Storage CORS**（未適用の場合 `getBytes` 失敗）: リポジトリ `storage.cors.json` をバケットに設定
+
+```bash
+gsutil cors set storage.cors.json gs://o-route.appspot.com
+# または
+gcloud storage buckets update gs://o-route.appspot.com --cors-file=storage.cors.json
+firebase deploy --only storage,hosting
+```
+
+Emulator では CORS 不要（E2E で確認済み）。
+
 - Firebase 設定（apiKey 等）は `src/firebase.ts` に直書き（クライアントアプリとして一般的）
-- 機微データの投入は想定外（`home_ja.md` にも明記）
+- 機微データの投入は想定外（`home_ja.md` にも明記）。E2EE でもメタデータは漏れる
 
 ---
 
@@ -342,13 +383,18 @@ npm run verify      # format + unit + e2e + build（エージェント向け一�
 
 （2026-07-06 リファクタで修正済み: `useOnlineLines` 自分の線判定、`useViewSharing` リスナーリーク、`pages/online` のリダイレクト）
 
+（2026-11-01 E2EE で修正済み: 後参加時の線 duplicate points、`follwer` 選択時の NaN view）
+
 ### インフラ・ツール
 
 | 項目 | 内容 |
 |------|------|
-| テスト | ユニット 35 件（Vitest）+ E2E 11 件（Playwright）。初回は `npm run test:e2e:install` と `sudo env "PATH=$PATH" npx playwright install-deps chromium` |
+| テスト | ユニット 67 件（Vitest: math, ViewModel, LineModel, roomCrypto, ChunkAssembler）+ E2E 32 件（home, local-canvas, online-room, online-sync, room-key, image-e2ee, view-e2ee） |
+| 本番 CORS | `storage.cors.json` + `gsutil`/`gcloud` で手動適用（コードデプロイだけでは不十分） |
+| Dev Container | **npm / test はコンテナ内で実行**。Windows ホストで `npm install` すると Linux 向け native binding（rolldown 等）が壊れ `vite` 失敗 → コンテナ内で `npm install` |
+| Vike | `^0.4.268`（0.4.260 は `--host`/`--port` 非対応で `npm run dev` / `e2e:server` 破損） |
 | Prettier | `.prettierrc.json` は `printWidth: 100`（空だと不正 JSON で `npm run format` が失敗。MUI アイコンの `@ts-ignore` 回避コードが折り返されないよう 100 が必要） |
-| tsconfig | `tsconfig.e2e.json` は `composite: true` かつ `noEmit: false`（親の `noEmit: true` を継承すると TS6310 で `tsc` が失敗） |
+| tsconfig | `tsconfig.e2e.json` は `composite: true` かつ `noEmit: false`（親の `noEmit: true` を継承すると TS6310 で `tsc` が失敗）。`.gitignore` に `*.tsbuildinfo` |
 | 依存 | `canvas` npm パッケージは削除済み（Konva ページはクライアント専用） |
 | Node | Dev Container を Node 24 LTS に更新済み。再ビルド後に `node -v` で確認 |
 | CI | 意図的に未導入（スキップ） |
@@ -357,9 +403,11 @@ npm run verify      # format + unit + e2e + build（エージェント向け一�
 
 ### 複雑度ホットスポット
 
-1. **`hooks/useOnlineLines.ts`** — Firebase 線の送受信・リスナー管理
-2. **`hooks/useViewSharing.ts`** — 視点共有・リーダー競合
-3. **`hooks/useCanvasGestures.ts`** — マウス/タッチ/ホイール/慣性の入力処理（旧 `Canvas.tsx` から抽出）
+1. **`hooks/useOnlineLines.ts`** — E2EE chunk 送受信・`enqueueLineWrite` キュー・`ChunkAssembler`・async decrypt の `cancelled` ガード。effect deps は `[linesRef]` のまま維持
+2. **`hooks/useViewSharing.ts`** — リーダー claim（`id` 先書き）・payload-only tick・フォロワー最新 snapshot のみ適用
+3. **`hooks/useOnlineRoomImage.ts`** — check 検証・Storage `getBytes`・blob URL ライフサイクル
+4. **`crypto/roomCrypto.ts`** — envelope / AAD / purpose 文字列の一貫性
+5. **`hooks/useCanvasGestures.ts`** — マウス/タッチ/ホイール/慣性の入力処理
 
 ---
 
@@ -371,11 +419,11 @@ npm run verify      # format + unit + e2e + build（エージェント向け一�
 
 | 観点 | 評価 |
 |------|------|
-| 規模 | 約 2,000 行・34 ファイルと小さく、全体把握が容易 |
+| 規模 | 約 2,500 行・50 ファイルと小さく、全体把握が容易 |
 | 型安全性 | `strict: true`、主要ドメインに型定義あり |
 | 責務分離 | `Canvas`（描画）と `Local/OnlineCanvas`（状態管理）が分離。オンライン同期は hooks に抽出済み |
 | ドメインモデル | `ViewModel` / `Lines` が Immutable Record で明示的 |
-| テスト | ユニット 35 + E2E 11。`npm run verify` でエージェント自律検証可能 |
+| テスト | ユニット 67 + E2E 32。`npm run verify` でエージェント自律検証可能 |
 | リンター | ESLint 設定が厳しめで、AI 生成コードの品質ガードになる |
 | このファイル | プロジェクト概要・構成が文書化済み |
 
@@ -383,7 +431,7 @@ npm run verify      # format + unit + e2e + build（エージェント向け一�
 
 | 観点 | リスク |
 |------|--------|
-| `useOnlineLines` の複雑さ | useEffect の依存配列・Firebase リスナー管理が難解 |
+| `useOnlineLines` の複雑さ | 暗号化 chunk・書き込みキュー・Assembler・effect 依存配列が難解 |
 | typo の存在 | `"follwer"` 等、AI が「修正すべき」と誤判断し DB 互換を壊す可能性 |
 | Immutable.js | 現行 React コードベースでは珍しく、AI が通常の object 操作を生成しがち |
 | Vike v1 design | フレームワーク固有のファイル命名（`+Page.tsx`, `+config.h.ts`）を AI が知らない場合がある |
@@ -396,7 +444,8 @@ AI コーディング環境を整えるための具体的な次ステップ。�
 
 | 優先度 | 施策 | 効果 |
 |--------|------|------|
-| 高 | `math.ts` / `ViewModel.ts` / `LineModel.ts` にユニットテスト追加 | 済（35 テスト） |
+| 高 | `roomCrypto.ts` / `ChunkAssembler.ts` ユニットテスト | 済（67 テスト中） |
+| 高 | `math.ts` / `ViewModel.ts` / `LineModel.ts` にユニットテスト追加 | 済 |
 | 済 | Playwright E2E + `npm run verify` | UI/操作/オンライン（Emulator）をエージェント自律検証可能に |
 | 済 | `OnlineCanvas.tsx` の同期ロジックをカスタムフックへ抽出 | `useOnlineRoomImage` / `useOnlineLines` / `useViewSharing` |
 | 済 | Firebase Emulator Suite の導入 | RTDB/Storage エミュレータ + `firebase-tools` |
@@ -407,6 +456,8 @@ AI コーディング環境を整えるための具体的な次ステップ。�
 | 済 | `canvas` 依存の削除 | Konva を `ssr.external` + ページ dynamic import で対応 |
 | — | CI（lint + build + test）の追加 | スキップ（手動で `npm run verify` を確認） |
 | 済 | Vite 8 / Vitest 4 化 | Vite 8 + Vitest 4 + Firebase 11 に更新済み |
+| 済 | オンライン E2EE | `roomCrypto`、chunk 線、暗号化 view/image、鍵は URL fragment |
+| 中 | 本番 Storage CORS 適用 | `storage.cors.json` 作成済み。バケットへの手動適用が残タスク |
 
 ---
 
@@ -418,7 +469,7 @@ AI コーディング環境を整えるための具体的な次ステップ。�
 |------|-------------|
 | キャンバス操作（ズーム/回転/描画） | `Canvas.tsx`, `ViewModel.ts`, `math.ts` |
 | ローカルモード | `LocalCanvas.tsx`, `LineModel.ts` |
-| オンライン同期 | `hooks/useOnlineLines.ts`, `hooks/useOnlineRoomImage.ts`, `OnlineCanvas.tsx`, `database.rules.json`, `firebase.ts` |
+| オンライン同期 / E2EE | `crypto/roomCrypto.ts`, `hooks/useOnlineLines.ts`, `hooks/useOnlineRoomImage.ts`, `hooks/useViewSharing.ts`, `models/ChunkAssembler.ts`, `OnlineCanvas.tsx`, `database.rules.json`, `storage.rules`, `firebase.ts` |
 | 視点共有 | `hooks/useViewSharing.ts`, `ViewSharingControl.tsx` |
 | UI ツールバー | `BasicControl.tsx`, `Overlay.tsx` |
 | 線の透明度 | `LineOpacityControl.tsx`, `Canvas.tsx`（`LINE_OPACITY_VALUES` と `cache()` 処理）, `types.ts` |
@@ -429,7 +480,7 @@ AI コーディング環境を整えるための具体的な次ステップ。�
 ### 安全な変更パターン
 
 1. **キャンバス変更** → `Canvas.tsx` と `ViewModel.ts` をセットで確認。Local / Online 両方に影響
-2. **同期ロジック変更** → `hooks/useOnlineLines.ts` / `useOnlineRoomImage.ts` / `useViewSharing.ts` と `database.rules.json` をセットで確認
+2. **同期ロジック変更** → 上記 hooks + `roomCrypto.ts` + `database.rules.json` + `storage.rules` をセットで確認。平文 `points` / 平文 view を復活させない
 3. **新ページ追加** → Vike の `src/pages/` 配下に `+Page.tsx` を追加
 4. **UI 変更** → MUI + 既存 `Overlay` / `ToggleButton` パターンに合わせる
 5. **状態モデル** → Immutable.js の `Record` パターンを維持（直接 mutate しない）
@@ -439,10 +490,12 @@ AI コーディング環境を整えるための具体的な次ステップ。�
 
 - `Lines` / `ViewModel` の内部フィールドを直接書き換えない
 - `"follwer"` を無断で `"follower"` に変更しない（既存ルームデータ・UI 状態に影響）
-- `OnlineCanvas` / `useOnlineLines` の `useEffect` 依存配列を安易に変更しない（リスナーリーク・二重登録の原因）
+- ルーム鍵を Firebase に書き込まない（fragment `#k=` のみ）
+- `useViewSharing` のリーダー tick で `view/id` を `update` しない（payload のみ）
+- `OnlineCanvas` / `useOnlineLines` の `useEffect` 依存配列を安易に変更しない（`useOnlineLines` は `[linesRef]`）
 - `Canvas.tsx` の透明度キャッシュ `useEffect([lines, lineOpacity])` を消さない（`translucent` の均一表示が壊れる）。`printWidth` を下げると MUI アイコンの `@ts-ignore` がずれてビルドが壊れる
 - Firebase ルールを緩めない（認証なし設計のまま公開運用されている）
-- 不要な抽象化レイヤーを追加しない（現状 2,000 行規模に対して過剰設計になりやすい）
+- 不要な抽象化レイヤーを追加しない（現状 ~2,500 行規模に対して過剰設計になりやすい）
 
 ### E2E 用 `data-testid`
 
@@ -452,9 +505,11 @@ AI コーディング環境を整えるための具体的な次ステップ。�
 | `mode-move` / `mode-draw` / `mode-erase` | ツールバーのモード切替 |
 | `clear-all` / `load-image` | 全消し・画像読み込み |
 | `opacity-opaque` / `opacity-translucent` / `opacity-transparent` | 線の透明度切替 |
+| `view-single` / `view-leader` / `view-follwer` | 視点共有モード（`follwer` typo 意図的） |
+| `invalid-room-key` | 無効鍵エラーページ |
 | `canvas-stage` | Konva Stage のラッパー |
 
-オンライン E2E のルーム作成は Emulator REST API（`e2e/helpers.ts`、namespace `o-route-default-rtdb`）を使用。
+オンライン E2E のルーム作成は Emulator REST API（`e2e/helpers.ts` の `createOnlineRoom` + `roomUrl`、namespace `o-route-default-rtdb`）。DB スナップショット検証は helpers 内で `roomCrypto` 復号。
 
 ### 変更後の確認手順
 
@@ -498,6 +553,10 @@ npm run emulators
 
 **トラブルシュート**: ブラウザで `127.0.0.1:9000` への `ERR_CONNECTION_REFUSED` が出る場合、アプリは Emulator 向きだが **RTDB Emulator が起動していない**（または Dev Container の port 9000 がホストに転送されていない）。`npm run dev:emulator` を使うか、別ターミナルで `npm run emulators` を先に起動する。
 
+**Dev Container / node_modules**: ホスト Windows で `npm install` すると bind mount 経由で Linux 向け native モジュールが上書きされ、コンテナ内の `vite` / `rolldown` が失敗することがある。復旧はコンテナ内で `npm install`（必要なら `npx playwright install chromium`）。
+
+**Vike**: `0.4.260` では Vite CLI の `--host` / `--port` が拒否され `npm run dev` と `npm run e2e:server` が起動しない。`package.json` は `^0.4.268`。
+
 ---
 
 ## 更新履歴
@@ -509,3 +568,4 @@ npm run emulators
 | 2026-07-05 | Cursor Agent（Composer） | Composer | Vitest ユニットテスト、Firebase Emulator、OnlineCanvas フック分割、canvas 削除、Playwright E2E、`npm run verify` を反映 |
 | 2026-07-05 | Cursor Agent（Claude Opus 4.8） | Claude Opus 4.8 | 線の透明度切替機能（`LineOpacityControl` + `Canvas` の `cache()` 均一化）、`.prettierrc.json`（printWidth 100）と `tsconfig.e2e.json`（noEmit false）の設定修正、E2E 11 件に増加を反映 |
 | 2026-07-06 | Cursor Agent | Auto | リファクタ計画実施: `useOnlineLines` バグ修正・unsubscribe 化、`useViewSharing` cleanup、`useCanvasGestures` 抽出、技術スタック表更新（Vite 8 / Vitest 4 / Firebase 11） |
+| 2026-11-01 | Cursor Agent | Claude Opus 5.5 (orchestrator) + Composer 2.5 (subagents) | オンライン E2EE（AES-GCM 256、鍵は URL `#k=`、chunk 線・暗号化 view/image）、`invalid_room_key` ページ、Storage CORS 手順、`storage.cors.json`、ユニット 67 / E2E 32、Vike 0.4.268、Dev Container 運用注意 |
