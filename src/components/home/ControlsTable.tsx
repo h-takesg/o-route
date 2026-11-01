@@ -53,12 +53,63 @@ const People: typeof People_ = People_.default ?? People_;
 
 const eraserIconStyle = { fontSize: "1.7rem" } as const;
 const chessKingIconStyle = { fontSize: "1.7rem" } as const;
+const chessKingIconStyleSmall = { fontSize: "1.25rem" } as const;
 
 type ControlRow = {
   icons: ReactNode;
   name: string;
-  description: string;
+  description: ReactNode;
 };
+
+type IconLabelRowProps = {
+  icon: ReactNode;
+  children: ReactNode;
+};
+
+function IconLabelRow({ icon, children }: IconLabelRowProps) {
+  return (
+    <Box component="li" sx={{ display: "flex", alignItems: "flex-start", gap: 1, mb: 0.75 }}>
+      <Box sx={{ display: "flex", alignItems: "center", flexShrink: 0, lineHeight: 0 }}>{icon}</Box>
+      <Box component="span">{children}</Box>
+    </Box>
+  );
+}
+
+const lineOpacityDescription = (
+  <Box>
+    <Box component="ul" sx={{ m: 0, p: 0, listStyle: "none" }}>
+      <IconLabelRow icon={<Circle fontSize="small" />}>不透明</IconLabelRow>
+      <IconLabelRow icon={<Contrast fontSize="small" />}>半透明</IconLabelRow>
+      <IconLabelRow icon={<RadioButtonUnchecked fontSize="small" />}>非表示</IconLabelRow>
+    </Box>
+    <Typography variant="body2" sx={{ mt: 1 }}>
+      線を不透明・半透明・非表示に切り替えます。この設定は自分の画面にだけ反映されます。
+    </Typography>
+  </Box>
+);
+
+const viewSharingDescription = (
+  <Box>
+    <Box component="ul" sx={{ m: 0, p: 0, listStyle: "none" }}>
+      <IconLabelRow icon={<Person fontSize="small" />}>
+        共有なし：各自が自由に操作します。
+      </IconLabelRow>
+      <IconLabelRow icon={<FaChessKing style={chessKingIconStyleSmall} />}>
+        リーダー：自分の視点を他の人に送ります。
+      </IconLabelRow>
+      <IconLabelRow icon={<People fontSize="small" />}>
+        フォロワー：リーダーの視点に自動で追従します。
+      </IconLabelRow>
+    </Box>
+    <Typography variant="body2" sx={{ mt: 1 }}>
+      リーダーは 1
+      人です。後からリーダーを選んだ人がリーダーになり、それまでのリーダーはフォロワーに切り替わります。
+    </Typography>
+    <Typography variant="body2">
+      フォロワーはリーダーの表示範囲がすべて収まる倍率で表示します。画面の縦横比が大きく違うと、表示が小さくなります。
+    </Typography>
+  </Box>
+);
 
 const controlRows: ControlRow[] = [
   {
@@ -98,8 +149,7 @@ const controlRows: ControlRow[] = [
       </Stack>
     ),
     name: "線の表示",
-    description:
-      "線を不透明・半透明・非表示に切り替えます。この設定は自分の画面にだけ反映されます。",
+    description: lineOpacityDescription,
   },
   {
     icons: (
@@ -110,8 +160,7 @@ const controlRows: ControlRow[] = [
       </Stack>
     ),
     name: "視点共有",
-    description:
-      "共有なし：各自が自由に操作します。リーダー：自分の視点を他の人に送ります。フォロワー：リーダーの視点に自動で追従します。リーダーは 1 人です。後からリーダーを選んだ人がリーダーになり、それまでのリーダーはフォロワーに切り替わります。フォロワーはリーダーの表示範囲がすべて収まる倍率で表示します。画面の縦横比が大きく違うと、表示が小さくなります。",
+    description: viewSharingDescription,
   },
 ];
 
@@ -135,8 +184,31 @@ function ControlsTable() {
       <Typography variant="body2" sx={{ mb: 3 }}>
         タッチ操作では、移動モードでスワイプして移動し、2 本指で拡大・縮小・回転します。
       </Typography>
-      <TableContainer sx={{ overflowX: "auto" }}>
-        <Table size="small" sx={{ minWidth: 320 }}>
+
+      <Box sx={{ display: { xs: "block", md: "none" } }}>
+        {controlRows.map((row) => (
+          <Box
+            key={row.name}
+            sx={{
+              py: 2,
+              borderBottom: 1,
+              borderColor: "divider",
+              "&:last-of-type": { borderBottom: 0 },
+            }}
+          >
+            <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+              {row.icons}
+              <Typography component="h4" variant="subtitle1">
+                {row.name}
+              </Typography>
+            </Stack>
+            <Box sx={{ typography: "body2" }}>{row.description}</Box>
+          </Box>
+        ))}
+      </Box>
+
+      <TableContainer sx={{ display: { xs: "none", md: "block" } }}>
+        <Table size="small">
           <TableHead>
             <TableRow>
               <TableCell sx={{ width: "8rem" }}>アイコン</TableCell>
