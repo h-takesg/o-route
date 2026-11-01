@@ -12,6 +12,14 @@ import {
   waitForKonvaMapImage,
 } from "../../e2e/helpers";
 
+import {
+  assertLegEndpoints,
+  assertNoBacktracking,
+  assertPathAvoidsLake,
+  mapFromCourse,
+  type MapPoint,
+} from "./course-data";
+
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptsDir, "../..");
 
@@ -22,23 +30,13 @@ export const HOME_IMAGES_DIR = path.join(repoRoot, "public", "images", "home");
 /** Left overlay toolbar width (approx.) — route points must be to the right of this. */
 export const TOOLBAR_GUTTER_PX = 110;
 
-/** Course geometry from generate-sample-map.mjs (map pixel coordinates). */
-export const MAP = {
-  width: 2400,
-  height: 1700,
-  start: [380, 580] as const,
-  controls: [
-    [620, 310],
-    [830, 560],
-    [1790, 390],
-    [1500, 660],
-    [1340, 780],
-    [620, 1040],
-    [740, 800],
-  ] as const,
-  finish: [1900, 1380] as const,
-  lakeCenter: [1150, 1140] as const,
-  knollHill: [620, 340] as const,
+/** Course geometry loaded from `sample-course.json`. */
+export const MAP = mapFromCourse();
+
+export type RouteLegMeta = {
+  label: string;
+  from: MapPoint;
+  to: MapPoint;
 };
 
 export type ScreenshotViewTarget = {
@@ -183,14 +181,22 @@ function addDeterministicJitter(
 /** Chaikin-smooth polyline, resample ~6 map px, tiny jitter; asserts ≤25 px from control polyline. */
 export function buildDrawPathFromWaypoints(
   waypoints: readonly (readonly [number, number])[],
+  leg?: RouteLegMeta,
 ): [number, number][] {
+  if (leg !== undefined) {
+    assertLegEndpoints(waypoints, leg.from, leg.to, leg.label);
+    assertNoBacktracking(waypoints, leg.label);
+  }
   const polyline = waypoints.map(([x, y]) => [x, y] as [number, number]);
   const smoothed = chaikinOpen(polyline, 2);
   const resampled = resamplePolyline(smoothed, 6);
   const overshoot = maxDistanceToPolyline(resampled, polyline);
   if (overshoot > 25) {
-    throw new Error(`route path overshoots polyline by ${overshoot.toFixed(1)} map px (max 25)`);
+    throw new Error(
+      `${leg?.label ?? "route"} path overshoots polyline by ${overshoot.toFixed(1)} map px (max 25)`,
+    );
   }
+  assertPathAvoidsLake(resampled, leg?.label ?? "route");
   return addDeterministicJitter(resampled, 1.5);
 }
 
@@ -610,9 +616,10 @@ export async function assertRouteVisibleOnCanvas(
 export async function drawRouteOnMap(
   page: Page,
   waypoints: readonly (readonly [number, number])[],
+  leg?: RouteLegMeta,
 ): Promise<void> {
   await selectMode(page, "draw");
-  const points = buildDrawPathFromWaypoints(waypoints);
+  const points = buildDrawPathFromWaypoints(waypoints, leg);
   const first = await mapPointToPageCoords(page, points[0][0], points[0][1]);
   await page.mouse.move(first.x, first.y);
   await page.mouse.down();

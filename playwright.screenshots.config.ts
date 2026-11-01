@@ -10,7 +10,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: 0,
   workers: 1,
-  timeout: 600_000,
+  timeout: 1_200_000,
   expect: { timeout: 30_000 },
   reporter: [["list"]],
   use: {
@@ -23,7 +23,7 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command:
-      "firebase emulators:exec --only database,storage 'VITE_USE_FIREBASE_EMULATOR=true vite --host --port 3100'",
+      "npx firebase emulators:exec --only database,storage 'VITE_USE_FIREBASE_EMULATOR=true vite --host --port 3100'",
     url: BASE_URL,
     timeout: 240_000,
     reuseExistingServer: false,
