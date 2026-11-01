@@ -1,5 +1,5 @@
 import { Box, Button, Stack, Typography } from "@mui/material";
-import { FramedScreenshot } from "./FramedScreenshot";
+import { DemoVideo } from "./DemoVideo";
 
 type Props = {
   onEnterLocal: () => void;
@@ -40,12 +40,15 @@ function HomeHero({ onEnterLocal, onEnterOnline }: Props) {
           </Button>
         </Stack>
       </Stack>
-      <FramedScreenshot
-        src="/images/home/hero.webp"
+      <DemoVideo
+        posterSrc="/images/home/hero.webp"
+        videoSrc="/images/home/hero.webm"
         width={1440}
         height={900}
         alt="O-Route の画面。地図画像の上に線が描かれ、ツールバーが表示されている。"
         loading="eager"
+        playTestId="demo-play-hero"
+        videoTestId="demo-video-hero"
       />
     </Box>
   );

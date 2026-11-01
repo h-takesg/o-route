@@ -1,4 +1,5 @@
 import { Box, Card, CardContent, Typography } from "@mui/material";
+import { DemoVideo } from "./DemoVideo";
 import { FramedScreenshot } from "./FramedScreenshot";
 
 function FeatureSection() {
@@ -22,11 +23,14 @@ function FeatureSection() {
             <Typography variant="body2" sx={{ mb: 2 }}>
               読み込んだ地図を拡大・縮小・回転しながら見られます。
             </Typography>
-            <FramedScreenshot
-              src="/images/home/rotate.webp"
+            <DemoVideo
+              posterSrc="/images/home/rotate.webp"
+              videoSrc="/images/home/rotate.webm"
               width={1152}
               height={864}
               alt="地図の移動・拡大・回転の操作例"
+              playTestId="demo-play-rotate"
+              videoTestId="demo-video-rotate"
             />
           </CardContent>
         </Card>
@@ -38,11 +42,14 @@ function FeatureSection() {
             <Typography variant="body2" sx={{ mb: 2 }}>
               ドラッグで線を描き、なぞった線を 1 本まるごと消せます。
             </Typography>
-            <FramedScreenshot
-              src="/images/home/draw-erase.webp"
+            <DemoVideo
+              posterSrc="/images/home/draw-erase.webp"
+              videoSrc="/images/home/draw-erase.webm"
               width={1152}
               height={864}
               alt="描画と消しゴムの操作例"
+              playTestId="demo-play-draw-erase"
+              videoTestId="demo-video-draw-erase"
             />
           </CardContent>
         </Card>
@@ -70,11 +77,14 @@ function FeatureSection() {
             <Typography variant="body2" sx={{ mb: 2 }}>
               リーダーの視点を他の人に送り、フォロワーはその視点に自動で追従します。
             </Typography>
-            <FramedScreenshot
-              src="/images/home/view-sharing.webp"
+            <DemoVideo
+              posterSrc="/images/home/view-sharing.webp"
+              videoSrc="/images/home/view-sharing.webm"
               width={2312}
               height={864}
               alt="視点共有の操作例"
+              playTestId="demo-play-view-sharing"
+              videoTestId="demo-video-view-sharing"
             />
           </CardContent>
         </Card>
