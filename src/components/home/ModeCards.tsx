@@ -49,6 +49,11 @@ function ModeCards({ onEnterLocal, onEnterOnline }: Props) {
               fullWidth
               data-testid="enter-local"
               onClick={onEnterLocal}
+              sx={{
+                bgcolor: "#111",
+                color: "#fff",
+                "&:hover": { bgcolor: "#333" },
+              }}
             >
               ローカルで始める
             </Button>
@@ -74,7 +79,7 @@ function ModeCards({ onEnterLocal, onEnterOnline }: Props) {
             <Button
               variant="contained"
               size="large"
-              color="secondary"
+              color="primary"
               fullWidth
               data-testid="enter-online"
               onClick={onEnterOnline}

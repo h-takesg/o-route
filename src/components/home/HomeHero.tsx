@@ -4,7 +4,7 @@ function HomeHero() {
   return (
     <Box component="section" sx={{ mb: 6 }}>
       <Stack spacing={2}>
-        <Typography component="h1" variant="h3">
+        <Typography component="h1" variant="h3" sx={{ fontWeight: 700 }}>
           O-Route
         </Typography>
         <Typography variant="body1">
