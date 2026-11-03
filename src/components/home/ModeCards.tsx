@@ -28,8 +28,8 @@ function ModeCards({ onEnterLocal, onEnterOnline }: Props) {
           gap: 3,
         }}
       >
-        <Card variant="outlined">
-          <CardContent>
+        <Card variant="outlined" sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+          <CardContent sx={{ flexGrow: 1 }}>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
               <Person color="primary" />
               <Typography component="h3" variant="h5">
@@ -42,14 +42,20 @@ function ModeCards({ onEnterLocal, onEnterOnline }: Props) {
               <li>タブを閉じるか再読み込みすると消えます。</li>
             </Typography>
           </CardContent>
-          <CardActions>
-            <Button data-testid="enter-local-card" onClick={onEnterLocal}>
+          <CardActions sx={{ mt: "auto", px: 2, pb: 2, pt: 0 }}>
+            <Button
+              variant="contained"
+              size="large"
+              fullWidth
+              data-testid="enter-local"
+              onClick={onEnterLocal}
+            >
               ローカルで始める
             </Button>
           </CardActions>
         </Card>
-        <Card variant="outlined">
-          <CardContent>
+        <Card variant="outlined" sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+          <CardContent sx={{ flexGrow: 1 }}>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
               <People color="primary" />
               <Typography component="h3" variant="h5">
@@ -64,8 +70,15 @@ function ModeCards({ onEnterLocal, onEnterOnline }: Props) {
               <li>ルームは作成から 24 時間有効で、その間は再読み込みしても内容が残ります。</li>
             </Typography>
           </CardContent>
-          <CardActions>
-            <Button data-testid="enter-online-card" onClick={onEnterOnline}>
+          <CardActions sx={{ mt: "auto", px: 2, pb: 2, pt: 0 }}>
+            <Button
+              variant="contained"
+              size="large"
+              color="secondary"
+              fullWidth
+              data-testid="enter-online"
+              onClick={onEnterOnline}
+            >
               オンラインで始める
             </Button>
           </CardActions>

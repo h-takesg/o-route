@@ -67,7 +67,7 @@ function Home() {
         py: { xs: 3, md: 4 },
       }}
     >
-      <HomeHero onEnterLocal={enterLocalRoom} onEnterOnline={enterNewRoom} />
+      <HomeHero />
       <ModeCards onEnterLocal={enterLocalRoom} onEnterOnline={enterNewRoom} />
       <FeatureSection />
       <ControlsTable />
